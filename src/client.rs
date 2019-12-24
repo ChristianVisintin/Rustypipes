@@ -1,5 +1,3 @@
-//! Library which provides functions to work with the Octopipes Protocol
-
 // 
 //   RustyPipes
 //   Developed by Christian Visintin
@@ -23,15 +21,4 @@
 // SOFTWARE.
 // 
 
-pub mod client;
-mod cap;
-mod pipes;
-mod serializer;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
