@@ -44,6 +44,7 @@ pub const RUSTYPIPES_VERSION_MINOR: i32 = 1;
 
 #[derive(Copy, Clone)]
 pub enum OctopipesError {
+    Success,
     Uninitialized,
     BadPacket,
     BadChecksum,
@@ -59,6 +60,16 @@ pub enum OctopipesError {
     ThreadAlreadyRunning,
     BadAlloc,
     Unknown
+}
+
+/// ### OctopipesCapError
+///
+/// `OctopipesCapError` describes the kind of error returned by an operation on the CAP
+
+#[derive(Copy, Clone)]
+pub enum OctopipesCapError {
+    NameAlreadyTaken = 1,
+    FileSystemError = 2
 }
 
 /// ### OctopipesState

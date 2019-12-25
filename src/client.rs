@@ -26,6 +26,7 @@
 // SOFTWARE.
 //
 
+use super::OctopipesCapError;
 use super::OctopipesClient;
 use super::OctopipesError;
 use super::OctopipesMessage;
@@ -64,7 +65,15 @@ impl OctopipesClient {
     }
   }
 
-  pub fn clone(client: &OctopipesClient) -> OctopipesClient {
+  /// ### OctopipesClient Clone
+  ///
+  /// `clone` is Creates a new OctopipesClient from another
+  /// #### Examples
+  /// ```
+  /// let mut client = OctopipesClient::clone(prev_client);
+  /// ```
+
+  fn clone(client: &OctopipesClient) -> OctopipesClient {
     OctopipesClient {
       id: client.id.clone(),
       version: client.version.clone(),
@@ -82,6 +91,9 @@ impl OctopipesClient {
 
   //Thread operations
 
+  /// ###  loop_start
+  ///
+  /// `loop_start` starts the client loop thread which checks if new messages are available
   /// #### Examples
   /// ```
   /// match my_client.loop_start() {
@@ -93,7 +105,7 @@ impl OctopipesClient {
   ///     }
   /// }
   /// ```
-  pub fn loop_start(&mut self) -> Result<OctopipesState, OctopipesError> {
+  pub fn loop_start(&mut self) -> OctopipesError {
     match self.state {
       OctopipesState::Subscribed => {
         //Create threaded client
@@ -117,13 +129,16 @@ impl OctopipesClient {
           };
         }));
         self.state = OctopipesState::Running;
-        Ok(OctopipesState::Running)
+        OctopipesError::Success
       }
-      OctopipesState::Running => Err(OctopipesError::ThreadAlreadyRunning),
-      _ => Err(OctopipesError::NotSubscribed),
+      OctopipesState::Running => OctopipesError::ThreadAlreadyRunning,
+      _ => OctopipesError::NotSubscribed,
     }
   }
 
+  /// ###  loop_stop
+  ///
+  /// `loop_stop` stops the client loop thread
   /// #### Examples
   /// ```
   /// match my_client.loop_stop() {
@@ -135,16 +150,98 @@ impl OctopipesClient {
   ///     }
   /// }
   /// ```
-  pub fn loop_stop(&mut self) -> Result<OctopipesState, OctopipesError> {
+  pub fn loop_stop(&mut self) -> OctopipesError {
     match self.state {
       OctopipesState::Running => {
         //Stop thread
         self.state = OctopipesState::Stopped;
         //Take joinable out of Option and then Join thread (NOTE: Using take prevents errors!)
         self.client_loop.take().map(thread::JoinHandle::join);
-        Ok(OctopipesState::Stopped)
+        OctopipesError::Success
       }
-      _ => Ok(OctopipesState::Subscribed),
+      _ => OctopipesError::Success,
     }
+  }
+
+  //Subscribption functions
+
+  /// ###  subscribe
+  ///
+  /// `subscribe` subscribe to Octopipes server; the client will subscribe to the groups described in the subscription_list
+
+  pub fn subscribe(
+    &mut self,
+    subscription_list: &Vec<String>,
+    mut cap_error: &OctopipesCapError,
+  ) -> OctopipesError {
+    //TODO: implement
+    OctopipesError::Unknown
+  }
+
+  /// ###  unsubscribe
+  ///
+  /// `unsubscribe` unsubscribe from Octopipes server; if thread is running it will be stopped
+
+  pub fn unsubscribe(&mut self) -> OctopipesError {
+    //TODO: implement
+    OctopipesError::Unknown
+  }
+
+  //Send message functions
+
+  /// ###  send
+  ///
+  /// `send` sends a message to a certain remote
+
+  pub fn send(&self, remote: &String, data: &Vec<u8>) -> OctopipesError {
+    self.send_ex(remote, data, 0, OctopipesOptions::Null)
+  }
+
+  /// ###  send_ex
+  ///
+  /// `send_ex` sends a message to a certain remote with extended options
+
+  pub fn send_ex(
+    &self,
+    remote: &String,
+    data: &Vec<u8>,
+    ttl: u8,
+    options: OctopipesOptions,
+  ) -> OctopipesError {
+    //TODO: implement
+    OctopipesError::Unknown
+  }
+
+  //Callbacks setters
+
+  /// ###  set_on_received_callback
+  ///
+  /// `set_on_received_callback` sets the function to call on message received
+  pub fn set_on_received_callback(
+    &mut self,
+    callback: fn(&OctopipesClient, Result<&OctopipesMessage, &OctopipesError>),
+  ) {
+    self.on_received_fn = Some(callback);
+  }
+
+  /// ###  set_on_sent_callbacl
+  ///
+  /// `set_on_sent_callbacl` sets the function to call when a message is sent
+  pub fn set_on_sent_callback(&mut self, callback: fn(&OctopipesClient, &OctopipesMessage)) {
+    self.on_sent_fn = Some(callback);
+  }
+
+  /// ###  set_on_subscribed
+  ///
+  /// `set_on_subscribed` sets the function to call on a successful subscription to the Octopipes Server
+  pub fn set_on_subscribed(&mut self, callback: fn(&OctopipesClient)) {
+    self.on_subscribed_fn = Some(callback);
+  }
+
+  /// ###  set_on_unsubscribed
+  ///
+  /// `set_on_unsubscribed` sets the function to call on a successful unsubscription from Octopipes server
+  pub fn set_on_unsubscribed(&mut self, callback: fn(&OctopipesClient)) {
+    self.on_unsubscribed_fn = Some(callback);
   }
 }
