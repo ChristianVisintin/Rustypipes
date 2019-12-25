@@ -1,4 +1,6 @@
-//! Library which provides functions to work with the Octopipes Protocol
+//! # RustyPipes
+//!
+//! `rusty-pipes` is a library which provides functions to work with the Octopipes Protocol
 
 // 
 //   RustyPipes
@@ -28,10 +30,105 @@ mod cap;
 mod pipes;
 mod serializer;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
+use std::thread;
+
+pub const RUSTYPIPES_VERSION: &str = "0.1.0";
+pub const RUSTYPIPES_VERSION_MAJOR: i32 = 0;
+pub const RUSTYPIPES_VERSION_MINOR: i32 = 1;
+
+/// ## Data types
+
+/// ### OctopipesError
+///
+/// `OctopipesError` describes the kind of error returned by an operation on the OctopipesClient
+
+#[derive(Copy, Clone)]
+pub enum OctopipesError {
+    Uninitialized,
+    BadPacket,
+    BadChecksum,
+    UnsupportedVersion,
+    NoDataAvailable,
+    OpenFailed,
+    WriteFailed,
+    ReadFailed,
+    CapTimeout,
+    NotSubscribed,
+    NotUnsubscribed,
+    ThreadError,
+    ThreadAlreadyRunning,
+    BadAlloc,
+    Unknown
+}
+
+/// ### OctopipesState
+///
+/// `OctopipesState` describes the current state of the OctopipesClient
+
+#[derive(Copy, Clone)]
+pub enum OctopipesState {
+    Initialized,
+    Subscribed,
+    Running,
+    Unsubscribed,
+    Stopped
+}
+
+/// ### OctopipesState
+///
+/// `OctopipesState` describes the current state of the OctopipesClient
+
+#[derive(Copy, Clone)]
+pub enum OctopipesOptions {
+    Null = 0,
+    RequireAck = 1,
+    Ack = 2,
+    IgnoreChecksum = 4
+}
+
+/// ### OctopipesProtocolVersion
+///
+/// `OctopipesProtocolVersion` describes the protocol version used by the client
+
+#[derive(Copy, Clone)]
+pub enum OctopipesProtocolVersion {
+    Version1 = 1
+}
+
+/// ### OctopipesMessage
+///
+/// `OctopipesMessage` contains the data of a message
+
+pub struct OctopipesMessage {
+    version: OctopipesProtocolVersion,
+    origin: String,
+    remote: String,
+    ttl: u8,
+    options: OctopipesOptions,
+    checksum: u8,
+    data_size: u64,
+    data: Vec<u64>
+}
+
+/// ### OctopipesClient
+///
+/// `OctopipesClient` is a container for an Octopipes Client
+
+pub struct OctopipesClient {
+    //Client params
+    id: String,
+    version: OctopipesProtocolVersion,
+    //Pipes paths
+    cap_pipe: String,
+    tx_pipe: Option<String>,
+    rx_pipe: Option<String>,
+    //State
+    state: OctopipesState,
+    //Thread
+    client_loop: Option<thread::JoinHandle<()>>,
+    //Callbacks
+    on_received_fn: Option<fn(&OctopipesClient, Result<&OctopipesMessage, &OctopipesError>)>,
+    on_sent_fn: Option<fn(&OctopipesClient, &OctopipesMessage)>,
+    on_subscribed_fn: Option<fn(&OctopipesClient)>,
+    on_unsubscribed_fn: Option<fn(&OctopipesClient)>
 }
