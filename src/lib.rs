@@ -32,6 +32,7 @@ mod pipes;
 mod serializer;
 
 use std::thread;
+use std::fmt;
 
 #[macro_use]
 extern crate bitflags;
@@ -171,5 +172,20 @@ impl OctopipesOptions {
             option.set(OctopipesOptions::ICK, true);
         }
         option
+    }
+}
+
+impl OctopipesError {
+    pub fn to_string(&self) -> &str {
+        match self {
+            //TODO: implement
+            _ => "Unknown error"
+        }
+    }
+}
+
+impl fmt::Debug for OctopipesError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
     }
 }

@@ -215,4 +215,11 @@ impl OctopipesClient {
     pub fn set_on_unsubscribed(&mut self, callback: fn(&OctopipesClient)) {
         self.on_unsubscribed_fn = Some(callback);
     }
+
+}
+
+impl Drop for OctopipesClient {
+    fn drop(&mut self) {       
+        //TODO: implement trait drop
+    }
 }
