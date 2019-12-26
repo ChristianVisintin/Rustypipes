@@ -59,8 +59,6 @@ impl OctopipesMessage {
     ///
     /// `isset_option` returns wheter an Octopipes Option is set for the current message
     pub fn isset_option(&self, option: OctopipesOptions) -> bool {
-        let rval = self.options as u8;
-        let llval = option as u8;
-        rval & llval != 0
+        self.options.intersects(option)
     }
 }

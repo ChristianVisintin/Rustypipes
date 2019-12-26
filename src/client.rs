@@ -165,7 +165,7 @@ impl OctopipesClient {
     /// `send` sends a message to a certain remote
 
     pub fn send(&self, remote: &String, data: &Vec<u8>) -> OctopipesError {
-        self.send_ex(remote, data, 0, OctopipesOptions::Null)
+        self.send_ex(remote, data, 0, OctopipesOptions::empty())
     }
 
     /// ###  send_ex

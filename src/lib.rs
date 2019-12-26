@@ -2,10 +2,10 @@
 //!
 //! `rusty-pipes` is a library which provides functions to work with the Octopipes Protocol
 
-// 
+//
 //   RustyPipes
 //   Developed by Christian Visintin
-// 
+//
 // MIT License
 // Copyright (c) 2019-2020 Christian Visintin
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,15 +23,18 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-// 
+//
 
+mod cap;
 pub mod client;
 pub mod message;
-mod cap;
 mod pipes;
 mod serializer;
 
 use std::thread;
+
+#[macro_use]
+extern crate bitflags;
 
 pub const RUSTYPIPES_VERSION: &str = "0.1.0";
 pub const RUSTYPIPES_VERSION_MAJOR: i32 = 0;
@@ -60,7 +63,7 @@ pub enum OctopipesError {
     ThreadError,
     ThreadAlreadyRunning,
     BadAlloc,
-    Unknown
+    Unknown,
 }
 
 /// ### OctopipesCapError
@@ -70,7 +73,7 @@ pub enum OctopipesError {
 #[derive(Copy, Clone)]
 pub enum OctopipesCapError {
     NameAlreadyTaken = 1,
-    FileSystemError = 2
+    FileSystemError = 2,
 }
 
 /// ### OctopipesState
@@ -83,19 +86,19 @@ pub enum OctopipesState {
     Subscribed,
     Running,
     Unsubscribed,
-    Stopped
+    Stopped,
 }
 
-/// ### OctopipesState
-///
-/// `OctopipesState` describes the current state of the OctopipesClient
+bitflags! {
 
-#[derive(Copy, Clone)]
-pub enum OctopipesOptions {
-    Null = 0,
-    RequireAck = 1,
-    Ack = 2,
-    IgnoreChecksum = 4
+    /// ### OctopipesState
+    ///
+    /// `OctopipesState` describes the current state of the OctopipesClient
+    pub struct OctopipesOptions: u8 {
+        const RCK = 0b00000001;
+        const ACK = 0b00000010;
+        const ICK = 0b00000100;
+    }
 }
 
 /// ### OctopipesProtocolVersion
@@ -104,7 +107,8 @@ pub enum OctopipesOptions {
 
 #[derive(Copy, Clone)]
 pub enum OctopipesProtocolVersion {
-    Version1 = 1
+    Unknown = 0,
+    Version1 = 1,
 }
 
 /// ### OctopipesMessage
@@ -118,7 +122,7 @@ pub struct OctopipesMessage {
     ttl: u8,
     options: OctopipesOptions,
     checksum: u8,
-    data: Vec<u8>
+    data: Vec<u8>,
 }
 
 /// ### OctopipesClient
@@ -141,5 +145,15 @@ pub struct OctopipesClient {
     on_received_fn: Option<fn(&OctopipesClient, Result<&OctopipesMessage, &OctopipesError>)>,
     on_sent_fn: Option<fn(&OctopipesClient, &OctopipesMessage)>,
     on_subscribed_fn: Option<fn(&OctopipesClient)>,
-    on_unsubscribed_fn: Option<fn(&OctopipesClient)>
+    on_unsubscribed_fn: Option<fn(&OctopipesClient)>,
+}
+
+//Types utils
+impl OctopipesProtocolVersion {
+    fn from_u8(value: u8) -> OctopipesProtocolVersion {
+        match value {
+            1 => OctopipesProtocolVersion::Version1,
+            _ => OctopipesProtocolVersion::Unknown,
+        }
+    }
 }
