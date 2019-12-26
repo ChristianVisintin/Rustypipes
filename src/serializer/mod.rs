@@ -218,7 +218,14 @@ fn decode_message(data: Vec<u8>) -> Result<OctopipesMessage, OctopipesError> {
                 payload.push(*byte);
             }
             //Instance OctopipesMessage
-            Ok(OctopipesMessage::new(&version, &origin, &remote, ttl, options, checksum, data))
+            let message: OctopipesMessage = OctopipesMessage::new(&version, &origin, &remote, ttl, options, checksum, data);
+            //Verify checksum if required
+            if ! message.isset_option(OctopipesOptions::ICK) {
+                if checksum != calculate_checksum(&message) {
+                    return Err(OctopipesError::BadChecksum)
+                }
+            }
+            Ok(message)
         },
         _ => return Err(OctopipesError::UnsupportedVersion)
     }
