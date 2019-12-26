@@ -112,13 +112,12 @@ pub enum OctopipesProtocolVersion {
 
 pub struct OctopipesMessage {
     version: OctopipesProtocolVersion,
-    origin: String,
-    remote: String,
+    origin: Option<String>,
+    remote: Option<String>,
     ttl: u8,
     options: OctopipesOptions,
     checksum: u8,
-    data_size: u64,
-    data: Vec<u64>
+    data: Vec<u8>
 }
 
 /// ### OctopipesClient

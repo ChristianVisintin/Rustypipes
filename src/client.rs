@@ -38,210 +38,181 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 impl OctopipesClient {
-  /// ### OctopipesClient Constructor
-  ///
-  /// `new` is constructor for OctopipesClient
-  /// #### Examples
-  /// ```
-  /// let mut client = OctopipesClient::new("test_client", "/tmp/pipe_cap", OctopipesProtocolVersion::Version1);
-  /// ```
-  pub fn new(
-    client_id: String,
-    cap_pipe: String,
-    version: OctopipesProtocolVersion,
-  ) -> OctopipesClient {
-    OctopipesClient {
-      id: client_id,
-      version: version,
-      cap_pipe: cap_pipe,
-      tx_pipe: None,
-      rx_pipe: None,
-      state: OctopipesState::Initialized,
-      client_loop: None,
-      on_received_fn: None,
-      on_sent_fn: None,
-      on_subscribed_fn: None,
-      on_unsubscribed_fn: None,
+    /// ### OctopipesClient Constructor
+    ///
+    /// `new` is constructor for OctopipesClient
+    pub fn new(
+        client_id: String,
+        cap_pipe: String,
+        version: OctopipesProtocolVersion,
+    ) -> OctopipesClient {
+        OctopipesClient {
+            id: client_id,
+            version: version,
+            cap_pipe: cap_pipe,
+            tx_pipe: None,
+            rx_pipe: None,
+            state: OctopipesState::Initialized,
+            client_loop: None,
+            on_received_fn: None,
+            on_sent_fn: None,
+            on_subscribed_fn: None,
+            on_unsubscribed_fn: None,
+        }
     }
-  }
 
-  /// ### OctopipesClient Clone
-  ///
-  /// `clone` is Creates a new OctopipesClient from another
-  /// #### Examples
-  /// ```
-  /// let mut client = OctopipesClient::clone(prev_client);
-  /// ```
+    /// ### OctopipesClient Clone
+    ///
+    /// `clone` is Creates a new OctopipesClient from another
 
-  fn clone(client: &OctopipesClient) -> OctopipesClient {
-    OctopipesClient {
-      id: client.id.clone(),
-      version: client.version.clone(),
-      cap_pipe: client.cap_pipe.clone(),
-      tx_pipe: client.tx_pipe.clone(),
-      rx_pipe: client.rx_pipe.clone(),
-      state: client.state.clone(),
-      client_loop: None,
-      on_received_fn: client.on_received_fn,
-      on_sent_fn: client.on_sent_fn,
-      on_subscribed_fn: client.on_subscribed_fn,
-      on_unsubscribed_fn: client.on_unsubscribed_fn,
+    fn clone(client: &OctopipesClient) -> OctopipesClient {
+        OctopipesClient {
+            id: client.id.clone(),
+            version: client.version.clone(),
+            cap_pipe: client.cap_pipe.clone(),
+            tx_pipe: client.tx_pipe.clone(),
+            rx_pipe: client.rx_pipe.clone(),
+            state: client.state.clone(),
+            client_loop: None,
+            on_received_fn: client.on_received_fn,
+            on_sent_fn: client.on_sent_fn,
+            on_subscribed_fn: client.on_subscribed_fn,
+            on_unsubscribed_fn: client.on_unsubscribed_fn,
+        }
     }
-  }
 
-  //Thread operations
+    //Thread operations
 
-  /// ###  loop_start
-  ///
-  /// `loop_start` starts the client loop thread which checks if new messages are available
-  /// #### Examples
-  /// ```
-  /// match my_client.loop_start() {
-  ///     Ok(_state) => {
-  ///         println!("Thread started!");
-  ///     },
-  ///     Error(err) => {
-  ///         println!("Error while trying to start thread");
-  ///     }
-  /// }
-  /// ```
-  pub fn loop_start(&mut self) -> OctopipesError {
-    match self.state {
-      OctopipesState::Subscribed => {
-        //Create threaded client
-        //Share state between threads
-        let shared_state = Arc::new(Mutex::new(self.state));
-        //Clone client for thread
-        let mut threaded_client: OctopipesClient = OctopipesClient::clone(self);
-        let shared_state = Arc::clone(&shared_state);
-        //Start thread
-        self.client_loop = Some(thread::spawn(move || {
-          //TODO: implement thread
-          let current_state = *shared_state.lock().unwrap();
-          threaded_client.state = current_state;
-          match threaded_client.state {
+    /// ###  loop_start
+    ///
+    /// `loop_start` starts the client loop thread which checks if new messages are available
+    pub fn loop_start(&mut self) -> OctopipesError {
+        match self.state {
+            OctopipesState::Subscribed => {
+                //Create threaded client
+                //Share state between threads
+                let shared_state = Arc::new(Mutex::new(self.state));
+                //Clone client for thread
+                let mut threaded_client: OctopipesClient = OctopipesClient::clone(self);
+                let shared_state = Arc::clone(&shared_state);
+                //Start thread
+                self.client_loop = Some(thread::spawn(move || {
+                    //TODO: implement thread
+                    let current_state = *shared_state.lock().unwrap();
+                    threaded_client.state = current_state;
+                    match threaded_client.state {
+                        OctopipesState::Running => {
+                            //TODO: read
+                        }
+                        _ => {
+                            //Exit
+                        }
+                    };
+                }));
+                self.state = OctopipesState::Running;
+                OctopipesError::Success
+            }
+            OctopipesState::Running => OctopipesError::ThreadAlreadyRunning,
+            _ => OctopipesError::NotSubscribed,
+        }
+    }
+
+    /// ###  loop_stop
+    ///
+    /// `loop_stop` stops the client loop thread
+    /// ```
+    pub fn loop_stop(&mut self) -> OctopipesError {
+        match self.state {
             OctopipesState::Running => {
-              //TODO: read
+                //Stop thread
+                self.state = OctopipesState::Stopped;
+                //Take joinable out of Option and then Join thread (NOTE: Using take prevents errors!)
+                self.client_loop.take().map(thread::JoinHandle::join);
+                OctopipesError::Success
             }
-            _ => {
-              //Exit
-            }
-          };
-        }));
-        self.state = OctopipesState::Running;
-        OctopipesError::Success
-      }
-      OctopipesState::Running => OctopipesError::ThreadAlreadyRunning,
-      _ => OctopipesError::NotSubscribed,
+            _ => OctopipesError::Success,
+        }
     }
-  }
 
-  /// ###  loop_stop
-  ///
-  /// `loop_stop` stops the client loop thread
-  /// #### Examples
-  /// ```
-  /// match my_client.loop_stop() {
-  ///     Ok(_state) => {
-  ///         println!("Thread stopped!");
-  ///     },
-  ///     Error(err) => {
-  ///         println!("Error while trying to stop thread");
-  ///     }
-  /// }
-  /// ```
-  pub fn loop_stop(&mut self) -> OctopipesError {
-    match self.state {
-      OctopipesState::Running => {
-        //Stop thread
-        self.state = OctopipesState::Stopped;
-        //Take joinable out of Option and then Join thread (NOTE: Using take prevents errors!)
-        self.client_loop.take().map(thread::JoinHandle::join);
-        OctopipesError::Success
-      }
-      _ => OctopipesError::Success,
+    //Subscribption functions
+
+    /// ###  subscribe
+    ///
+    /// `subscribe` subscribe to Octopipes server; the client will subscribe to the groups described in the subscription_list
+
+    pub fn subscribe(
+        &mut self,
+        subscription_list: &Vec<String>,
+        mut cap_error: &OctopipesCapError,
+    ) -> OctopipesError {
+        //TODO: implement
+        OctopipesError::Unknown
     }
-  }
 
-  //Subscribption functions
+    /// ###  unsubscribe
+    ///
+    /// `unsubscribe` unsubscribe from Octopipes server; if thread is running it will be stopped
 
-  /// ###  subscribe
-  ///
-  /// `subscribe` subscribe to Octopipes server; the client will subscribe to the groups described in the subscription_list
+    pub fn unsubscribe(&mut self) -> OctopipesError {
+        //TODO: implement
+        OctopipesError::Unknown
+    }
 
-  pub fn subscribe(
-    &mut self,
-    subscription_list: &Vec<String>,
-    mut cap_error: &OctopipesCapError,
-  ) -> OctopipesError {
-    //TODO: implement
-    OctopipesError::Unknown
-  }
+    //Send message functions
 
-  /// ###  unsubscribe
-  ///
-  /// `unsubscribe` unsubscribe from Octopipes server; if thread is running it will be stopped
+    /// ###  send
+    ///
+    /// `send` sends a message to a certain remote
 
-  pub fn unsubscribe(&mut self) -> OctopipesError {
-    //TODO: implement
-    OctopipesError::Unknown
-  }
+    pub fn send(&self, remote: &String, data: &Vec<u8>) -> OctopipesError {
+        self.send_ex(remote, data, 0, OctopipesOptions::Null)
+    }
 
-  //Send message functions
+    /// ###  send_ex
+    ///
+    /// `send_ex` sends a message to a certain remote with extended options
 
-  /// ###  send
-  ///
-  /// `send` sends a message to a certain remote
+    pub fn send_ex(
+        &self,
+        remote: &String,
+        data: &Vec<u8>,
+        ttl: u8,
+        options: OctopipesOptions,
+    ) -> OctopipesError {
+        //TODO: implement
+        OctopipesError::Unknown
+    }
 
-  pub fn send(&self, remote: &String, data: &Vec<u8>) -> OctopipesError {
-    self.send_ex(remote, data, 0, OctopipesOptions::Null)
-  }
+    //Callbacks setters
 
-  /// ###  send_ex
-  ///
-  /// `send_ex` sends a message to a certain remote with extended options
+    /// ###  set_on_received_callback
+    ///
+    /// `set_on_received_callback` sets the function to call on message received
+    pub fn set_on_received_callback(
+        &mut self,
+        callback: fn(&OctopipesClient, Result<&OctopipesMessage, &OctopipesError>),
+    ) {
+        self.on_received_fn = Some(callback);
+    }
 
-  pub fn send_ex(
-    &self,
-    remote: &String,
-    data: &Vec<u8>,
-    ttl: u8,
-    options: OctopipesOptions,
-  ) -> OctopipesError {
-    //TODO: implement
-    OctopipesError::Unknown
-  }
+    /// ###  set_on_sent_callbacl
+    ///
+    /// `set_on_sent_callbacl` sets the function to call when a message is sent
+    pub fn set_on_sent_callback(&mut self, callback: fn(&OctopipesClient, &OctopipesMessage)) {
+        self.on_sent_fn = Some(callback);
+    }
 
-  //Callbacks setters
+    /// ###  set_on_subscribed
+    ///
+    /// `set_on_subscribed` sets the function to call on a successful subscription to the Octopipes Server
+    pub fn set_on_subscribed(&mut self, callback: fn(&OctopipesClient)) {
+        self.on_subscribed_fn = Some(callback);
+    }
 
-  /// ###  set_on_received_callback
-  ///
-  /// `set_on_received_callback` sets the function to call on message received
-  pub fn set_on_received_callback(
-    &mut self,
-    callback: fn(&OctopipesClient, Result<&OctopipesMessage, &OctopipesError>),
-  ) {
-    self.on_received_fn = Some(callback);
-  }
-
-  /// ###  set_on_sent_callbacl
-  ///
-  /// `set_on_sent_callbacl` sets the function to call when a message is sent
-  pub fn set_on_sent_callback(&mut self, callback: fn(&OctopipesClient, &OctopipesMessage)) {
-    self.on_sent_fn = Some(callback);
-  }
-
-  /// ###  set_on_subscribed
-  ///
-  /// `set_on_subscribed` sets the function to call on a successful subscription to the Octopipes Server
-  pub fn set_on_subscribed(&mut self, callback: fn(&OctopipesClient)) {
-    self.on_subscribed_fn = Some(callback);
-  }
-
-  /// ###  set_on_unsubscribed
-  ///
-  /// `set_on_unsubscribed` sets the function to call on a successful unsubscription from Octopipes server
-  pub fn set_on_unsubscribed(&mut self, callback: fn(&OctopipesClient)) {
-    self.on_unsubscribed_fn = Some(callback);
-  }
+    /// ###  set_on_unsubscribed
+    ///
+    /// `set_on_unsubscribed` sets the function to call on a successful unsubscription from Octopipes server
+    pub fn set_on_unsubscribed(&mut self, callback: fn(&OctopipesClient)) {
+        self.on_unsubscribed_fn = Some(callback);
+    }
 }
