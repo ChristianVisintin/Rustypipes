@@ -99,7 +99,7 @@ fn encode_message(message: &mut OctopipesMessage) -> Result<Vec<u8>, OctopipesEr
             data_out.push(message.ttl);
             //Data Size
             let payload_size_64: u64 = message.data.len() as u64;
-            for i in 7..1 {
+            for i in (0..8).rev() {
                 let val: u8 = ((payload_size_64 >> (i * 8)) & 0xFF) as u8;
                 data_out.push(val);
             }
@@ -119,8 +119,8 @@ fn encode_message(message: &mut OctopipesMessage) -> Result<Vec<u8>, OctopipesEr
             //if isset option IGNORE CHECKSUM do not set checksum
             if !message.isset_option(OctopipesOptions::ICK) {
                 //set checksum
-                let checksum = calculate_checksum(message);
-                data_out[checksum_index] = checksum;
+                message.checksum = calculate_checksum(message);
+                data_out[checksum_index] = message.checksum;
             }
             Ok(data_out)
         }
@@ -145,7 +145,7 @@ fn decode_message(data: Vec<u8>) -> Result<OctopipesMessage, OctopipesError> {
         OctopipesProtocolVersion::Version1 => {
             let mut current_min_size: usize = MINIMUM_SIZE_VERSION_1; //Minimum packet size
             let mut curr_index: usize = 2;
-            let mut final_index: usize = 0;
+            let mut final_index: usize;
             if data.len() < current_min_size {
                 return Err(OctopipesError::BadPacket)
             }
@@ -158,7 +158,7 @@ fn decode_message(data: Vec<u8>) -> Result<OctopipesMessage, OctopipesError> {
             //Get origin
             curr_index += 1;
             final_index = curr_index + origin_size;
-            let mut origin:  Option<String>;
+            let origin:  Option<String>;
             if origin_size > 0 {
                 let mut origin_str: String = String::with_capacity(origin_size);
                 for byte in &data[curr_index..final_index] {
@@ -176,7 +176,7 @@ fn decode_message(data: Vec<u8>) -> Result<OctopipesMessage, OctopipesError> {
             if data.len() < current_min_size {
                 return Err(OctopipesError::BadPacket)
             }
-            let mut remote: Option<String>;
+            let remote: Option<String>;
             if remote_size > 0 {
                 let mut remote_str: String = String::with_capacity(remote_size);
                 for byte in &data[curr_index..final_index] {
@@ -278,4 +278,87 @@ fn calculate_checksum(message: &OctopipesMessage) -> u8 {
         _ => return 0
     }
     checksum
+}
+
+//@! Tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_rck() {
+        let payload: Vec<u8> = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let origin: String = String::from("test_client");
+        let remote: String = String::from("test_remote");
+        //Calculate estimated size
+        let predicted_size: usize = MINIMUM_SIZE_VERSION_1 + origin.len() + remote.len() + payload.len();
+        //Prepare message
+        let mut message: OctopipesMessage = OctopipesMessage::new(&OctopipesProtocolVersion::Version1, &Some(origin.clone()), &Some(remote.clone()), 60, OctopipesOptions::RCK, 0, payload);
+        //Encode message
+        let data: Vec<u8> = encode_message(&mut message).expect("Could not encode message");
+        let checksum = message.checksum;
+        //Dump data
+        print!("Data dump: ");
+        for byte in &data {
+            print!("{:02x} ", *byte);
+        }
+        println!();
+        //Check if size is correct
+        assert_eq!(predicted_size, data.len(), "Expected size {} is different from data size {}", predicted_size, data.len());
+        println!("Data size is correct: {}", data.len());
+        //Verify payload bytes
+        println!("Verifying if data bytes are encoded as we expect");
+        //SOH
+        assert_eq!(*data.get(0).unwrap(), SOH, "Byte at 0: {:02x} is not SOH {:02x}", *data.get(0).unwrap(), SOH);
+        //Version
+        assert_eq!(*data.get(1).unwrap(), OctopipesProtocolVersion::Version1 as u8, "Byte at 1: {:02x} is not {:02x}", *data.get(1).unwrap(), OctopipesProtocolVersion::Version1 as u8);
+        //Origin size
+        assert_eq!(*data.get(2).unwrap() as usize, origin.len(), "Byte at 2: {:02x} is not {:02x}", *data.get(2).unwrap() as usize, origin.len());
+        //Origin
+        println!("Checking Origin");
+        let origin_bytes = &data[3..14];
+        let origin_chars: Vec<char> = origin.chars().collect();
+        for i in 0..origin.len() {
+            assert_eq!(origin_chars[i], origin_bytes[i] as char, "Byte at {}: {} is not {}", i + 2, origin_chars[i], origin_bytes[i] as char);
+        }
+        //Remote size
+        assert_eq!(*data.get(14).unwrap() as usize, remote.len(), "Byte at 14: {:02x} is not {:02x}", *data.get(14).unwrap() as usize, remote.len());
+        //Remote
+        let remote_bytes = &data[15..26];
+        let remote_chars: Vec<char> = remote.chars().collect();
+        for i in 0..remote.len() {
+            assert_eq!(remote_chars[i], remote_bytes[i] as char, "Byte at {}: {} is not {}", i + 15, remote_chars[i], remote_bytes[i] as char);
+        }
+        //TTL
+        assert_eq!(*data.get(26).unwrap(), 60, "Byte at 26: {:02x} is not {:02x}", *data.get(26).unwrap() as usize, 60);
+        //Data Size (should be 9)
+        assert_eq!(*data.get(27).unwrap(), 0, "Byte at 27: {:02x} is not {:02x}", *data.get(27).unwrap(), 0);
+        assert_eq!(*data.get(28).unwrap(), 0, "Byte at 28: {:02x} is not {:02x}", *data.get(28).unwrap(), 0);
+        assert_eq!(*data.get(29).unwrap(), 0, "Byte at 29: {:02x} is not {:02x}", *data.get(29).unwrap(), 0);
+        assert_eq!(*data.get(30).unwrap(), 0, "Byte at 30: {:02x} is not {:02x}", *data.get(30).unwrap(), 0);
+        assert_eq!(*data.get(31).unwrap(), 0, "Byte at 31: {:02x} is not {:02x}", *data.get(31).unwrap(), 0);
+        assert_eq!(*data.get(32).unwrap(), 0, "Byte at 32: {:02x} is not {:02x}", *data.get(32).unwrap(), 0);
+        assert_eq!(*data.get(33).unwrap(), 0, "Byte at 33: {:02x} is not {:02x}", *data.get(33).unwrap(), 0);
+        assert_eq!(*data.get(34).unwrap(), 9, "Byte at 34: {:02x} is not {:02x}", *data.get(34).unwrap(), 9);
+        //Options (RCK)
+        assert_eq!(*data.get(35).unwrap(), 1, "Byte at 35: {:02x} is not {:02x}", *data.get(35).unwrap(), 1);
+        //Checksum
+        assert_eq!(*data.get(36).unwrap(), checksum, "Byte at 36: {:02x} is not {:02x}", *data.get(36).unwrap(), checksum);
+        //STX
+        assert_eq!(*data.get(37).unwrap(), STX, "Byte at 37: {:02x} is not {:02x}", *data.get(37).unwrap(), STX);
+        //Data
+        assert_eq!(*data.get(38).unwrap(), 1, "Byte at 38: {:02x} is not {:02x}", *data.get(38).unwrap(), 1);
+        assert_eq!(*data.get(39).unwrap(), 2, "Byte at 39: {:02x} is not {:02x}", *data.get(39).unwrap(), 2);
+        assert_eq!(*data.get(40).unwrap(), 3, "Byte at 40: {:02x} is not {:02x}", *data.get(40).unwrap(), 3);
+        assert_eq!(*data.get(41).unwrap(), 4, "Byte at 41: {:02x} is not {:02x}", *data.get(41).unwrap(), 4);
+        assert_eq!(*data.get(42).unwrap(), 5, "Byte at 42: {:02x} is not {:02x}", *data.get(42).unwrap(), 5);
+        assert_eq!(*data.get(43).unwrap(), 6, "Byte at 43: {:02x} is not {:02x}", *data.get(43).unwrap(), 6);
+        assert_eq!(*data.get(44).unwrap(), 7, "Byte at 44: {:02x} is not {:02x}", *data.get(44).unwrap(), 7);
+        assert_eq!(*data.get(45).unwrap(), 8, "Byte at 45: {:02x} is not {:02x}", *data.get(45).unwrap(), 8);
+        assert_eq!(*data.get(46).unwrap(), 9, "Byte at 46: {:02x} is not {:02x}", *data.get(46).unwrap(), 9);
+        //ETX
+        assert_eq!(*data.get(47).unwrap(), ETX, "Byte at 47: {:02x} is not {:02x}", *data.get(47).unwrap(), ETX);
+        println!("Packet encoded successfully");
+    }
 }
