@@ -26,6 +26,7 @@
 // 
 
 pub mod client;
+pub mod message;
 mod cap;
 mod pipes;
 mod serializer;
