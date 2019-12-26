@@ -157,3 +157,19 @@ impl OctopipesProtocolVersion {
         }
     }
 }
+
+impl OctopipesOptions {
+    pub fn from_u8(value: u8) -> OctopipesOptions {
+        let mut option: OctopipesOptions = OctopipesOptions::empty();
+        if value & OctopipesOptions::RCK.bits() != 0 {
+            option.set(OctopipesOptions::RCK, true);
+        }
+        if value & OctopipesOptions::ACK.bits() != 0 {
+            option.set(OctopipesOptions::ACK, true);
+        }
+        if value & OctopipesOptions::ICK.bits() != 0 {
+            option.set(OctopipesOptions::ICK, true);
+        }
+        option
+    }
+}

@@ -33,7 +33,7 @@ impl OctopipesMessage {
     /// ### OctopipesMessage Constructor
     ///
     /// `new` is constructor for OctopipesMessage
-    fn new(version: &OctopipesProtocolVersion, origin: &Option<String>, remote: &Option<String>, ttl: u8, options: OctopipesOptions, checksum: u8, data: Vec<u8>) -> OctopipesMessage {
+    pub fn new(version: &OctopipesProtocolVersion, origin: &Option<String>, remote: &Option<String>, ttl: u8, options: OctopipesOptions, checksum: u8, data: Vec<u8>) -> OctopipesMessage {
         OctopipesMessage {
             version: *version,
             origin: match origin {
