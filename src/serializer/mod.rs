@@ -227,7 +227,7 @@ fn decode_message(data: Vec<u8>) -> Result<OctopipesMessage, OctopipesError> {
             }
             //Instance OctopipesMessage
             let message: OctopipesMessage =
-                OctopipesMessage::new(&version, &origin, &remote, ttl, options, checksum, payload);
+                OctopipesMessage::new(&version, origin, remote, ttl, options, checksum, payload);
             //Verify checksum if required
             if !message.isset_option(OctopipesOptions::ICK) {
                 if checksum != calculate_checksum(&message) {
@@ -307,8 +307,8 @@ mod tests {
         //Prepare message
         let mut message: OctopipesMessage = OctopipesMessage::new(
             &OctopipesProtocolVersion::Version1,
-            &Some(origin.clone()),
-            &Some(remote.clone()),
+            Some(origin.clone()),
+            Some(remote.clone()),
             60,
             OctopipesOptions::RCK,
             0,
@@ -567,8 +567,8 @@ mod tests {
         //Prepare message
         let mut message: OctopipesMessage = OctopipesMessage::new(
             &OctopipesProtocolVersion::Version1,
-            &Some(origin.clone()),
-            &None,
+            Some(origin.clone()),
+            None,
             60,
             OctopipesOptions::ICK,
             0,
@@ -817,8 +817,8 @@ mod tests {
         //Prepare message
         let mut message: OctopipesMessage = OctopipesMessage::new(
             &OctopipesProtocolVersion::Version1,
-            &None,
-            &None,
+            None,
+            None,
             0,
             OctopipesOptions::empty(),
             0,
