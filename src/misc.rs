@@ -35,7 +35,7 @@ use std::fmt;
 
 //Types utils
 impl OctopipesProtocolVersion {
-    pub fn from_u8(value: u8) -> OctopipesProtocolVersion {
+    pub(crate) fn from_u8(value: u8) -> OctopipesProtocolVersion {
         match value {
             1 => OctopipesProtocolVersion::Version1,
             _ => OctopipesProtocolVersion::Unknown,
@@ -44,7 +44,7 @@ impl OctopipesProtocolVersion {
 }
 
 impl OctopipesCapMessage {
-    pub fn from_u8(value: u8) -> OctopipesCapMessage {
+    pub(crate) fn from_u8(value: u8) -> OctopipesCapMessage {
         match value {
             0x01 => OctopipesCapMessage::Subscribe,
             0x02 => OctopipesCapMessage::Unsubscribe,
@@ -55,7 +55,7 @@ impl OctopipesCapMessage {
 }
 
 impl OctopipesOptions {
-    pub fn from_u8(value: u8) -> OctopipesOptions {
+    pub(crate) fn from_u8(value: u8) -> OctopipesOptions {
         let mut option: OctopipesOptions = OctopipesOptions::empty();
         if value & OctopipesOptions::RCK.bits() != 0 {
             option.set(OctopipesOptions::RCK, true);
