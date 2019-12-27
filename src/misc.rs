@@ -25,6 +25,7 @@
 // SOFTWARE.
 //
 
+use super::OctopipesCapError;
 use super::OctopipesCapMessage;
 use super::OctopipesError;
 use super::OctopipesProtocolVersion;
@@ -50,6 +51,16 @@ impl OctopipesCapMessage {
             0x02 => OctopipesCapMessage::Unsubscribe,
             0xff => OctopipesCapMessage::Assignment,
             _ => OctopipesCapMessage::Unknown,
+        }
+    }
+}
+
+impl OctopipesCapError {
+    pub(crate) fn from_u8(value: u8) -> OctopipesCapError {
+        match value {
+            0x01 => OctopipesCapError::NameAlreadyTaken,
+            0x02 => OctopipesCapError::FileSystemError,
+            _ => OctopipesCapError::NoError
         }
     }
 }

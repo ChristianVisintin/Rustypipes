@@ -47,7 +47,7 @@ pub const RUSTYPIPES_VERSION_MINOR: i32 = 1;
 ///
 /// `OctopipesError` describes the kind of error returned by an operation on the OctopipesClient
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum OctopipesError {
     Success,
     Uninitialized,
@@ -70,8 +70,9 @@ pub enum OctopipesError {
 ///
 /// `OctopipesCapError` describes the kind of error returned by an operation on the CAP
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum OctopipesCapError {
+    NoError = 0,
     NameAlreadyTaken = 1,
     FileSystemError = 2,
 }
@@ -80,7 +81,7 @@ pub enum OctopipesCapError {
 ///
 /// `OctopipesCapMessage` describes the CAP message type
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum OctopipesCapMessage {
     Unknown = 0x00,
     Subscribe = 0x01,
@@ -92,7 +93,7 @@ pub enum OctopipesCapMessage {
 ///
 /// `OctopipesState` describes the current state of the OctopipesClient
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum OctopipesState {
     Initialized,
     Subscribed,
@@ -159,3 +160,5 @@ pub struct OctopipesClient {
     on_subscribed_fn: Option<fn(&OctopipesClient)>,
     on_unsubscribed_fn: Option<fn(&OctopipesClient)>,
 }
+
+//TODO: server structs (OctopipesServer, OctopipesServerWorker)

@@ -125,3 +125,110 @@ fn get_cap_message_type(data: &Vec<u8>) -> Result<OctopipesCapMessage, Octopipes
         _ => Ok(message_type),
     }
 }
+
+/// ### decode_subscribe
+///
+/// `decode_subscribe` decode a subscribe message
+fn decode_subscribe(data: &Vec<u8>) -> Result<Vec<String>, OctopipesError> {
+    //Size must be at least 2
+    if data.len() < 2 {
+        return Err(OctopipesError::BadPacket)
+    }
+    //Check byte 0
+    if data[0] != OctopipesCapMessage::Subscribe as u8 {
+        return Err(OctopipesError::BadPacket)
+    }
+    //Get groups amount
+    let groups_amount: usize = data[1] as usize;
+    //Instance groups
+    let mut groups: Vec<String> = Vec::with_capacity(groups_amount);
+    //Parse groups
+    let mut index: usize = 3;
+    while index < data.len() && groups.len() < groups_amount {
+        let group_size: usize = data[index] as usize;
+        index += 1;
+        let final_index: usize = index + group_size;
+        let mut group_str: String = String::with_capacity(group_size);
+        for byte in &data[index..final_index] {
+            group_str.push(*byte as char);
+        }
+        groups.push(group_str);
+        index += final_index;
+    }
+    if groups.len() != groups_amount {
+        return Err(OctopipesError::BadPacket)
+    }
+    Ok(groups)
+}
+
+/// ### decode_assignment
+///
+/// `decode_assignment` decode an assignment message
+fn decode_assignment(data: &Vec<u8>) -> Result<(OctopipesCapError, Option<String>, Option<String>), OctopipesError> {
+    //Size must be at least 2
+    if data.len() < 2 {
+        return Err(OctopipesError::BadPacket)
+    }
+    //Check byte 0
+    if data[0] != OctopipesCapMessage::Assignment as u8 {
+        return Err(OctopipesError::BadPacket)
+    }
+    //Check Cap Error
+    let cap_error: OctopipesCapError = OctopipesCapError::from_u8(data[1]);
+    //If error is set, don't parse pipes paths
+    if cap_error != OctopipesCapError::NoError {
+        return Ok((cap_error, None, None))
+    }
+    //Length must be at least 4 then (will be longer actually)
+    if data.len() < 4 {
+        return Err(OctopipesError::BadPacket)
+    }
+    //Otherwise get pipes paths
+    let pipe_tx_length: usize = data[2] as usize;
+    let minimum_size: usize = 4 + pipe_tx_length;
+    //Check new minimum size
+    if data.len() < minimum_size {
+        return Err(OctopipesError::BadPacket)
+    }
+    //Get pipe tx
+    let index: usize = 3;
+    let final_index: usize = index + pipe_tx_length;
+    if final_index > data.len() {
+        return Err(OctopipesError::BadPacket)
+    }
+    let mut pipe_tx: String = String::with_capacity(pipe_tx_length);
+    for byte in &data[index..final_index] {
+        pipe_tx.push(*byte as char);
+    }
+    let index: usize = final_index;
+    if index >= data.len() {
+        return Err(OctopipesError::BadPacket)
+    }
+    //Get pipe rx length
+    let pipe_rx_length: usize = data[index] as usize;
+    let index: usize = index + 1;
+    let final_index: usize = index + pipe_rx_length;
+    if final_index > data.len() {
+        return Err(OctopipesError::BadPacket)
+    }
+    let mut pipe_rx: String = String::with_capacity(pipe_rx_length);
+    for byte in &data[index..final_index] {
+        pipe_rx.push(*byte as char);
+    }
+    Ok((cap_error, Some(pipe_tx), Some(pipe_rx)))
+}
+
+/// ### decode_unsubscribe
+///
+/// `decode_unsubscribe` decode an unsubscribe message
+fn decode_unsubscribe(data: &Vec<u8>) -> Result<OctopipesCapMessage, OctopipesError> {
+    //Size must be at least 1
+    if data.len() < 1 {
+        return Err(OctopipesError::BadPacket)
+    }
+    //Check byte 0
+    if data[0] != OctopipesCapMessage::Unsubscribe as u8 {
+        return Err(OctopipesError::BadPacket)
+    }
+    Ok(OctopipesCapMessage::Unsubscribe)
+}
