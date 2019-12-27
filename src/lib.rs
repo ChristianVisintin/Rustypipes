@@ -76,6 +76,18 @@ pub enum OctopipesCapError {
     FileSystemError = 2,
 }
 
+/// ### OctopipesCapMessage
+///
+/// `OctopipesCapMessage` describes the CAP message type
+
+#[derive(Copy, Clone)]
+pub enum OctopipesCapMessage {
+    Unknown = 0x00,
+    Subscribe = 0x01,
+    Unsubscribe = 0x02,
+    Assignment = 0xff
+}
+
 /// ### OctopipesState
 ///
 /// `OctopipesState` describes the current state of the OctopipesClient

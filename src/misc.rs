@@ -25,6 +25,7 @@
 // SOFTWARE.
 //
 
+use super::OctopipesCapMessage;
 use super::OctopipesError;
 use super::OctopipesProtocolVersion;
 use super::OctopipesOptions;
@@ -38,6 +39,17 @@ impl OctopipesProtocolVersion {
         match value {
             1 => OctopipesProtocolVersion::Version1,
             _ => OctopipesProtocolVersion::Unknown,
+        }
+    }
+}
+
+impl OctopipesCapMessage {
+    pub fn from_u8(value: u8) -> OctopipesCapMessage {
+        match value {
+            0x01 => OctopipesCapMessage::Subscribe,
+            0x02 => OctopipesCapMessage::Unsubscribe,
+            0xff => OctopipesCapMessage::Assignment,
+            _ => OctopipesCapMessage::Unknown,
         }
     }
 }
