@@ -90,3 +90,9 @@ impl fmt::Debug for OctopipesError {
         write!(f, "{}", self.to_string())
     }
 }
+
+impl fmt::Display for OctopipesError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
