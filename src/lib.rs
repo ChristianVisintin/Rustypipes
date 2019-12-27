@@ -28,11 +28,11 @@
 mod cap;
 pub mod client;
 pub mod message;
+pub(crate) mod misc;
 mod pipes;
 mod serializer;
 
 use std::thread;
-use std::fmt;
 
 #[macro_use]
 extern crate bitflags;
@@ -63,7 +63,6 @@ pub enum OctopipesError {
     NotUnsubscribed,
     ThreadError,
     ThreadAlreadyRunning,
-    BadAlloc,
     Unknown,
 }
 
@@ -147,45 +146,4 @@ pub struct OctopipesClient {
     on_sent_fn: Option<fn(&OctopipesClient, &OctopipesMessage)>,
     on_subscribed_fn: Option<fn(&OctopipesClient)>,
     on_unsubscribed_fn: Option<fn(&OctopipesClient)>,
-}
-
-//Types utils
-impl OctopipesProtocolVersion {
-    fn from_u8(value: u8) -> OctopipesProtocolVersion {
-        match value {
-            1 => OctopipesProtocolVersion::Version1,
-            _ => OctopipesProtocolVersion::Unknown,
-        }
-    }
-}
-
-impl OctopipesOptions {
-    pub fn from_u8(value: u8) -> OctopipesOptions {
-        let mut option: OctopipesOptions = OctopipesOptions::empty();
-        if value & OctopipesOptions::RCK.bits() != 0 {
-            option.set(OctopipesOptions::RCK, true);
-        }
-        if value & OctopipesOptions::ACK.bits() != 0 {
-            option.set(OctopipesOptions::ACK, true);
-        }
-        if value & OctopipesOptions::ICK.bits() != 0 {
-            option.set(OctopipesOptions::ICK, true);
-        }
-        option
-    }
-}
-
-impl OctopipesError {
-    pub fn to_string(&self) -> &str {
-        match self {
-            //TODO: implement
-            _ => "Unknown error"
-        }
-    }
-}
-
-impl fmt::Debug for OctopipesError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_string())
-    }
 }
