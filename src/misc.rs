@@ -65,9 +65,17 @@ impl OctopipesCapMessage {
 impl OctopipesCapError {
     pub(crate) fn from_u8(value: u8) -> Option<OctopipesCapError> {
         match value {
+            0x00 => Some(OctopipesCapError::NoError),
             0x01 => Some(OctopipesCapError::NameAlreadyTaken),
             0x02 => Some(OctopipesCapError::FileSystemError),
             _ => None
+        }
+    }
+    pub(crate) fn to_string(&self) -> &str {
+        match self {
+            OctopipesCapError::FileSystemError => "FileSystemError",
+            OctopipesCapError::NameAlreadyTaken => "NameAlreadyTaken",
+            OctopipesCapError::NoError => "NoError"
         }
     }
 }
@@ -134,6 +142,18 @@ impl fmt::Display for OctopipesCapMessage {
 }
 
 impl fmt::Debug for OctopipesCapMessage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
+
+impl fmt::Display for OctopipesCapError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
+
+impl fmt::Debug for OctopipesCapError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.to_string())
     }
