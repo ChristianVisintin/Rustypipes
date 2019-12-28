@@ -99,7 +99,6 @@ impl OctopipesOptions {
 impl OctopipesError {
     pub fn to_string(&self) -> &str {
         match self {
-            OctopipesError::Success => "Not an error",
             OctopipesError::Uninitialized => "OctopipesClient is not initialized yet",
             OctopipesError::BadChecksum => "Packet has bad checksum",
             OctopipesError::BadPacket => "It was not possible to decode packet, since it contains bad data",

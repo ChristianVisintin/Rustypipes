@@ -222,7 +222,7 @@ fn decode_assignment(
 /// ### decode_unsubscription
 ///
 /// `decode_unsubscription` decode an unsubscribe message
-fn decode_unsubscription(data: &Vec<u8>) -> Result<OctopipesCapMessage, OctopipesError> {
+fn decode_unsubscription(data: &Vec<u8>) -> Result<(), OctopipesError> {
     //Size must be at least 1
     if data.len() < 1 {
         return Err(OctopipesError::BadPacket);
@@ -231,7 +231,7 @@ fn decode_unsubscription(data: &Vec<u8>) -> Result<OctopipesCapMessage, Octopipe
     if data[0] != OctopipesCapMessage::Unsubscription as u8 {
         return Err(OctopipesError::BadPacket);
     }
-    Ok(OctopipesCapMessage::Unsubscription)
+    Ok(())
 }
 
 //@! Tests

@@ -66,7 +66,7 @@ impl OctopipesClient {
     /// ###  loop_start
     ///
     /// `loop_start` starts the client loop thread which checks if new messages are available
-    pub fn loop_start(&mut self, this: Arc<Mutex<Self>>) -> OctopipesError {
+    pub fn loop_start(&mut self, this: Arc<Mutex<Self>>) -> Result<(), OctopipesError> {
         match self.state {
             OctopipesState::Subscribed => {
                 //Create threaded client
@@ -83,10 +83,10 @@ impl OctopipesClient {
                 }));
                 //Set state to running
                 self.state = OctopipesState::Running;
-                OctopipesError::Success
+                Ok(())
             }
-            OctopipesState::Running => OctopipesError::ThreadAlreadyRunning,
-            _ => OctopipesError::NotSubscribed,
+            OctopipesState::Running => Err(OctopipesError::ThreadAlreadyRunning),
+            _ => Err(OctopipesError::NotSubscribed),
         }
     }
 
@@ -94,16 +94,16 @@ impl OctopipesClient {
     ///
     /// `loop_stop` stops the client loop thread
     /// ```
-    pub fn loop_stop(&mut self) -> OctopipesError {
+    pub fn loop_stop(&mut self) -> Result<(), OctopipesError> {
         match self.state {
             OctopipesState::Running => {
                 //Stop thread
                 self.state = OctopipesState::Stopped;
                 //Take joinable out of Option and then Join thread (NOTE: Using take prevents errors!)
                 self.client_loop.take().map(thread::JoinHandle::join);
-                OctopipesError::Success
+                Ok(())
             }
-            _ => OctopipesError::Success,
+            _ => Ok(()),
         }
     }
 
@@ -117,18 +117,18 @@ impl OctopipesClient {
         &mut self,
         subscription_list: &Vec<String>,
         mut cap_error: &OctopipesCapError,
-    ) -> OctopipesError {
+    ) -> Result<(), OctopipesError> {
         //TODO: implement
-        OctopipesError::Unknown
+        Err(OctopipesError::Unknown)
     }
 
     /// ###  unsubscribe
     ///
     /// `unsubscribe` unsubscribe from Octopipes server; if thread is running it will be stopped
 
-    pub fn unsubscribe(&mut self) -> OctopipesError {
+    pub fn unsubscribe(&mut self) -> Result<(), OctopipesError> {
         //TODO: implement
-        OctopipesError::Unknown
+        Err(OctopipesError::Unknown)
     }
 
     //Send message functions
@@ -137,7 +137,7 @@ impl OctopipesClient {
     ///
     /// `send` sends a message to a certain remote
 
-    pub fn send(&self, remote: &String, data: &Vec<u8>) -> OctopipesError {
+    pub fn send(&self, remote: &String, data: &Vec<u8>) -> Result<(), OctopipesError> {
         self.send_ex(remote, data, 0, OctopipesOptions::empty())
     }
 
@@ -151,9 +151,9 @@ impl OctopipesClient {
         data: &Vec<u8>,
         ttl: u8,
         options: OctopipesOptions,
-    ) -> OctopipesError {
+    ) -> Result<(), OctopipesError> {
         //TODO: implement
-        OctopipesError::Unknown
+        Err(OctopipesError::Unknown)
     }
 
     //Callbacks setters

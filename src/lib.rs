@@ -50,7 +50,6 @@ pub const RUSTYPIPES_VERSION_MINOR: i32 = 1;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum OctopipesError {
-    Success,
     Uninitialized,
     BadPacket,
     BadChecksum,
