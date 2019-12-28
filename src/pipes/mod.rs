@@ -59,7 +59,7 @@ fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<Vec<u8>> {
     if res.is_err() {
         return Err(res.err().unwrap())
     }
-    let mut pipe = res.unwrap();;
+    let mut pipe = res.unwrap();
     let t_start = Instant::now();
     let mut time_elapsed: Duration = Duration::from_millis(0);
     let mut data_out: Vec<u8> = Vec::new();
@@ -108,7 +108,7 @@ fn pipe_write(path: &String, timeout_millis: u128, data_out: Vec<u8>) -> std::io
     if res.is_err() {
         return Err(res.err().unwrap())
     }
-    let mut pipe = res.unwrap();;
+    let mut pipe = res.unwrap();
     let t_start = Instant::now();
     let mut time_elapsed: Duration = Duration::from_millis(0);
     let mut bytes_written: usize = 0;
@@ -130,4 +130,80 @@ fn pipe_write(path: &String, timeout_millis: u128, data_out: Vec<u8>) -> std::io
         }
     }
     Ok(())
+}
+
+//@! Tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread;
+
+    #[test]
+    fn test_pipe_create_and_delete() {
+        //Try to create a pipe in /tmp/pipe_test
+        match pipe_create(&String::from("/tmp/pipe_test")) {
+            Ok(_) => println!("Pipe created with success"),
+            Err(ioerr) => panic!("Could not create pipe: {}", ioerr)
+        }
+        ////Then delete it
+        match pipe_delete(&String::from("/tmp/pipe_test")) {
+            Ok(_) => println!("Pipe deleted with success"),
+            Err(ioerr) => panic!("Could not delete previously created pipe: {}", ioerr)
+        }
+    }
+
+    #[test]
+    fn test_pipe_io() {
+        //Create tx and rx pipes
+        let pipe_tx: String = String::from("/tmp/pipe_tx");
+        let pipe_rx: String = String::from("/tmp/pipe_rx");
+        match pipe_create(&pipe_tx) {
+            Ok(_) => println!("Pipe created with success"),
+            Err(ioerr) => panic!("Could not create pipe: {}", ioerr)
+        }
+        match pipe_create(&pipe_rx) {
+            Ok(_) => println!("Pipe created with success"),
+            Err(ioerr) => panic!("Could not create pipe: {}", ioerr)
+        }
+        //Create a thread for write
+        let pipe_rx_copy: String = pipe_rx.clone();
+        let join_hnd: thread::JoinHandle<()> = thread::spawn(move || {
+            //Prepare data (255 bytes, from 0 to ff)
+            let mut data: Vec<u8> = Vec::with_capacity(255);
+            for i in 0..255 {
+                data.push(i);
+            }
+            //Write data
+            match pipe_write(&pipe_rx_copy, 5000, data) {
+                Ok(()) => println!("Successfully wrote 255 bytes to pipe rx"),
+                Err(ioerr) => panic!("Could not write to pipe: {}", ioerr)
+            }
+        });
+        //Read
+        match pipe_read(&pipe_rx, 5000) {
+            Ok(data) => {
+                //Print data
+                print!("Pipe Read - Successfully read data: ");
+                for byte in &data {
+                    print!("{:02x} ", byte);
+                }
+                println!("\n");
+                assert_eq!(data.len(), 255, "Pipe read: data len should be 255, but is {}", data.len());
+            },
+            Err(ioerr) => panic!("Error while reading from pipe: {}", ioerr)
+        }
+        join_hnd.join().expect("Could not join write thread");
+        println!("Write thread ended");
+        //Delete pipes
+        match pipe_delete(&pipe_tx) {
+            Ok(_) => println!("Pipe deleted with success"),
+            Err(ioerr) => panic!("Could not delete previously created pipe: {}", ioerr)
+        }
+        match pipe_delete(&pipe_rx) {
+            Ok(_) => println!("Pipe deleted with success"),
+            Err(ioerr) => panic!("Could not delete previously created pipe: {}", ioerr)
+        }
+    }
+
 }

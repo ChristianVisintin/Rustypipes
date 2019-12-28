@@ -326,7 +326,7 @@ mod tests {
         for byte in &data {
             print!("{:02x} ", *byte);
         }
-        println!();
+        println!("");
         //Check if size is correct
         assert_eq!(
             predicted_size,
@@ -591,7 +591,7 @@ mod tests {
         for byte in &data {
             print!("{:02x} ", *byte);
         }
-        println!();
+        println!("\n");
         //Check if size is correct
         assert_eq!(
             predicted_size,
@@ -836,7 +836,7 @@ mod tests {
         for byte in &data {
             print!("{:02x} ", *byte);
         }
-        println!();
+        println!("\n");
         //Check if size is correct
         assert_eq!(
             predicted_size,
