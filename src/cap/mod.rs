@@ -121,10 +121,10 @@ fn get_cap_message_type(data: &Vec<u8>) -> Result<OctopipesCapMessage, Octopipes
     }
 }
 
-/// ### decode_subscribe
+/// ### decode_subscription
 ///
-/// `decode_subscribe` decode a subscribe message
-fn decode_subscribe(data: &Vec<u8>) -> Result<Vec<String>, OctopipesError> {
+/// `decode_subscription` decode a subscribe message
+fn decode_subscription(data: &Vec<u8>) -> Result<Vec<String>, OctopipesError> {
     //Size must be at least 2
     if data.len() < 2 {
         return Err(OctopipesError::BadPacket);
@@ -219,10 +219,10 @@ fn decode_assignment(
     Ok((cap_error, Some(pipe_tx), Some(pipe_rx)))
 }
 
-/// ### decode_unsubscribe
+/// ### decode_unsubscription
 ///
-/// `decode_unsubscribe` decode an unsubscribe message
-fn decode_unsubscribe(data: &Vec<u8>) -> Result<OctopipesCapMessage, OctopipesError> {
+/// `decode_unsubscription` decode an unsubscribe message
+fn decode_unsubscription(data: &Vec<u8>) -> Result<OctopipesCapMessage, OctopipesError> {
     //Size must be at least 1
     if data.len() < 1 {
         return Err(OctopipesError::BadPacket);
@@ -630,7 +630,7 @@ mod tests {
     fn test_parse_subscribe() {
         //Create a subscribe payload to decode (two groups, SYS and HW)
         let payload: Vec<u8> = vec![0x01, 0x02, 0x03, 'S' as u8, 'Y' as u8, 'S' as u8, 0x02, 'H' as u8, 'W' as u8];
-        match decode_subscribe(&payload) {
+        match decode_subscription(&payload) {
             Ok(groups) => {
                 //Check groups
                 assert_eq!(groups.len(), 2, "There should be two groups; found {}", groups.len());
@@ -649,7 +649,7 @@ mod tests {
     fn test_parse_subscribe_nok() {
         //Create a subscribe payload to decode (two groups, but one is missing)
         let payload: Vec<u8> = vec![0x01, 0x02, 0x03, 'S' as u8, 'Y' as u8, 'S' as u8];
-        match decode_subscribe(&payload) {
+        match decode_subscription(&payload) {
             Ok(..) => {
                 panic!("Decode should have failed");
             },
@@ -679,8 +679,61 @@ mod tests {
             Err(..) => panic!("Assignment decode shouldn't have returned error")
         }
     }
-    //TODO: parse assignment with CAP error
-    //TODO: parse assignment error
-    //TODO: parse unsubscribe
-    //TODO: parse unsubscribe error
+
+    #[test]
+    fn test_parse_assignment_cap_error() {
+        //Create an assignment payload to decode with CAP Error (NAME ALREADY TAKEN)
+        let payload: Vec<u8> = vec![0xff, 0x01];
+        match decode_assignment(&payload) {
+            Ok((cap_error, pipe_tx, pipe_rx)) => {
+                //Cap Error should be none
+                assert_eq!(cap_error, OctopipesCapError::NameAlreadyTaken, "CAP Error should be NameAlreadyTaken, but is {}", cap_error);
+                //Pipe tx
+                assert!(pipe_tx.is_none(), "Pipe TX shouldn't be Some");
+                assert!(pipe_rx.is_none(), "Pipe RX shouldn't be Some");
+            },
+            Err(..) => panic!("Assignment decode shouldn't have returned error")
+        }
+    }
+
+    #[test]
+    fn test_parse_assignment_with_error() {
+        //Create a bad assignment payload to decode
+        let payload: Vec<u8> = vec![0xff, 0x00, 0x0c]; //No pipes
+        match decode_assignment(&payload) {
+            Ok(..) => {
+                panic!("Assignment decode should have returned error");
+            },
+            Err(err) => {
+                assert_eq!(err, OctopipesError::BadPacket, "Decode assignment should have returned BadPacket but returned {}", err);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_unsubscription() {
+        //Create an assignment payload to decode with CAP Error (NAME ALREADY TAKEN)
+        let payload: Vec<u8> = vec![0x02];
+        match decode_unsubscription(&payload) {
+            Ok(..) => {
+                println!("Unsubscription test passed")
+            },
+            Err(..) => {
+                panic!("Unsubscribe should have been parsed without errors")
+            }
+        }
+    }
+    #[test]
+    fn test_parse_unsubscription_with_error() {
+        //Create an assignment payload to decode with CAP Error (NAME ALREADY TAKEN)
+        let payload: Vec<u8> = vec![0x00];
+        match decode_unsubscription(&payload) {
+            Ok(..) => {
+                panic!("Unsubscribe packet should have returned error")
+            },
+            Err(err) => {
+                assert_eq!(err, OctopipesError::BadPacket, "Decode unsubscription should have returned BadPacket but returned {}", err);
+            }
+        }
+    }
 }
