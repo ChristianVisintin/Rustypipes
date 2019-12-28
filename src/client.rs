@@ -61,54 +61,27 @@ impl OctopipesClient {
         }
     }
 
-    /// ### OctopipesClient Clone
-    ///
-    /// `clone` is Creates a new OctopipesClient from another
-
-    fn clone(client: &OctopipesClient) -> OctopipesClient {
-        OctopipesClient {
-            id: client.id.clone(),
-            version: client.version.clone(),
-            cap_pipe: client.cap_pipe.clone(),
-            tx_pipe: client.tx_pipe.clone(),
-            rx_pipe: client.rx_pipe.clone(),
-            state: client.state.clone(),
-            client_loop: None,
-            on_received_fn: client.on_received_fn,
-            on_sent_fn: client.on_sent_fn,
-            on_subscribed_fn: client.on_subscribed_fn,
-            on_unsubscribed_fn: client.on_unsubscribed_fn,
-        }
-    }
-
     //Thread operations
 
     /// ###  loop_start
     ///
     /// `loop_start` starts the client loop thread which checks if new messages are available
-    pub fn loop_start(&mut self) -> OctopipesError {
+    pub fn loop_start(&mut self, this: Arc<Mutex<Self>>) -> OctopipesError {
         match self.state {
             OctopipesState::Subscribed => {
                 //Create threaded client
-                //Share state between threads
-                let shared_state = Arc::new(Mutex::new(self.state));
-                //Clone client for thread
-                let mut threaded_client: OctopipesClient = OctopipesClient::clone(self);
-                let shared_state = Arc::clone(&shared_state);
-                //Start thread
                 self.client_loop = Some(thread::spawn(move || {
                     //TODO: implement thread
-                    let current_state = *shared_state.lock().unwrap();
-                    threaded_client.state = current_state;
-                    match threaded_client.state {
-                        OctopipesState::Running => {
-                            //TODO: read
+                    loop {
+                        let client = this.lock().unwrap();
+                        if client.state != OctopipesState::Running {
+                            break;
                         }
-                        _ => {
-                            //Exit
-                        }
-                    };
+                        //TODO: read
+                    }
+                    //Exit
                 }));
+                //Set state to running
                 self.state = OctopipesState::Running;
                 OctopipesError::Success
             }
@@ -220,6 +193,8 @@ impl OctopipesClient {
 
 impl Drop for OctopipesClient {
     fn drop(&mut self) {       
-        //TODO: implement trait drop
+        //Stop thread
+        self.loop_stop();
+        drop(self);
     }
 }

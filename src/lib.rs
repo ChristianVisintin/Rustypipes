@@ -158,4 +158,21 @@ pub struct OctopipesClient {
     on_unsubscribed_fn: Option<fn(&OctopipesClient)>,
 }
 
-//TODO: server structs (OctopipesServer, OctopipesServerWorker)
+/// ### OctopipesServer
+///
+/// `OctopipesServer` is a container for an Octopipes Server
+pub struct OctopipesServer {
+    //Server params
+    version: OctopipesProtocolVersion,
+    //Pipe
+    cap_pipe: String,
+    //Thread
+    cap_listener: Option<thread::JoinHandle<()>>,
+    //TODO: add workers
+    //Callbacks
+    on_cap_message_fn: fn(Result<&OctopipesMessage, &OctopipesError>)
+}
+
+struct OctopipesServerWorker {
+    
+}
