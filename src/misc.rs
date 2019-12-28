@@ -36,31 +36,38 @@ use std::fmt;
 
 //Types utils
 impl OctopipesProtocolVersion {
-    pub(crate) fn from_u8(value: u8) -> OctopipesProtocolVersion {
+    pub(crate) fn from_u8(value: u8) -> Option<OctopipesProtocolVersion> {
         match value {
-            1 => OctopipesProtocolVersion::Version1,
-            _ => OctopipesProtocolVersion::Unknown,
+            1 => Some(OctopipesProtocolVersion::Version1),
+            _ => None,
         }
     }
 }
 
 impl OctopipesCapMessage {
-    pub(crate) fn from_u8(value: u8) -> OctopipesCapMessage {
+    pub(crate) fn from_u8(value: u8) -> Option<OctopipesCapMessage> {
         match value {
-            0x01 => OctopipesCapMessage::Subscribe,
-            0x02 => OctopipesCapMessage::Unsubscribe,
-            0xff => OctopipesCapMessage::Assignment,
-            _ => OctopipesCapMessage::Unknown,
+            0x01 => Some(OctopipesCapMessage::Subscribe),
+            0x02 => Some(OctopipesCapMessage::Unsubscribe),
+            0xff => Some(OctopipesCapMessage::Assignment),
+            _ => None,
+        }
+    }
+    pub(crate) fn to_string(&self) -> &str {
+        match self {
+            OctopipesCapMessage::Assignment => "ASSIGNMENT",
+            OctopipesCapMessage::Subscribe => "SUBSCRIBE",
+            OctopipesCapMessage::Unsubscribe => "UNSUBSCRIBE"
         }
     }
 }
 
 impl OctopipesCapError {
-    pub(crate) fn from_u8(value: u8) -> OctopipesCapError {
+    pub(crate) fn from_u8(value: u8) -> Option<OctopipesCapError> {
         match value {
-            0x01 => OctopipesCapError::NameAlreadyTaken,
-            0x02 => OctopipesCapError::FileSystemError,
-            _ => OctopipesCapError::NoError
+            0x01 => Some(OctopipesCapError::NameAlreadyTaken),
+            0x02 => Some(OctopipesCapError::FileSystemError),
+            _ => None
         }
     }
 }
@@ -78,12 +85,6 @@ impl OctopipesOptions {
             option.set(OctopipesOptions::ICK, true);
         }
         option
-    }
-}
-
-impl fmt::Display for OctopipesOptions {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.bits())
     }
 }
 
@@ -115,6 +116,24 @@ impl fmt::Debug for OctopipesError {
 }
 
 impl fmt::Display for OctopipesError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
+
+impl fmt::Display for OctopipesOptions {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.bits())
+    }
+}
+
+impl fmt::Display for OctopipesCapMessage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
+
+impl fmt::Debug for OctopipesCapMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.to_string())
     }

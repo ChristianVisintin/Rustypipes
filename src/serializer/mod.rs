@@ -140,103 +140,107 @@ fn decode_message(data: Vec<u8>) -> Result<OctopipesMessage, OctopipesError> {
     if *data.get(0).unwrap() != SOH {
         return Err(OctopipesError::BadPacket);
     }
-    let version: OctopipesProtocolVersion =
-        OctopipesProtocolVersion::from_u8(*data.get(1).unwrap());
-    match version {
-        OctopipesProtocolVersion::Version1 => {
-            let mut current_min_size: usize = MINIMUM_SIZE_VERSION_1; //Minimum packet size
-            let mut curr_index: usize = 2;
-            let mut final_index: usize;
-            if data.len() < current_min_size {
-                return Err(OctopipesError::BadPacket);
-            }
-            //Get sizes
-            let origin_size: usize = *data.get(2).unwrap() as usize;
-            current_min_size = current_min_size + origin_size;
-            if data.len() < current_min_size {
-                return Err(OctopipesError::BadPacket);
-            }
-            //Get origin
-            curr_index += 1;
-            final_index = curr_index + origin_size;
-            let origin: Option<String>;
-            if origin_size > 0 {
-                let mut origin_str: String = String::with_capacity(origin_size);
-                for byte in &data[curr_index..final_index] {
-                    origin_str.push(*byte as char);
+    let version_opt: Option<OctopipesProtocolVersion> = OctopipesProtocolVersion::from_u8(*data.get(1).unwrap());
+    match version_opt {
+        Some(version) => {
+            match version {
+                OctopipesProtocolVersion::Version1 => {
+                    let mut current_min_size: usize = MINIMUM_SIZE_VERSION_1; //Minimum packet size
+                    let mut curr_index: usize = 2;
+                    let mut final_index: usize;
+                    if data.len() < current_min_size {
+                        return Err(OctopipesError::BadPacket);
+                    }
+                    //Get sizes
+                    let origin_size: usize = *data.get(2).unwrap() as usize;
+                    current_min_size = current_min_size + origin_size;
+                    if data.len() < current_min_size {
+                        return Err(OctopipesError::BadPacket);
+                    }
+                    //Get origin
+                    curr_index += 1;
+                    final_index = curr_index + origin_size;
+                    let origin: Option<String>;
+                    if origin_size > 0 {
+                        let mut origin_str: String = String::with_capacity(origin_size);
+                        for byte in &data[curr_index..final_index] {
+                            origin_str.push(*byte as char);
+                        }
+                        origin = Some(origin_str);
+                    } else {
+                        origin = None
+                    }
+                    curr_index = final_index;
+                    let remote_size: usize = *data.get(curr_index).unwrap() as usize;
+                    current_min_size += remote_size;
+                    curr_index += 1;
+                    final_index = curr_index + remote_size;
+                    if data.len() < current_min_size {
+                        return Err(OctopipesError::BadPacket);
+                    }
+                    let remote: Option<String>;
+                    if remote_size > 0 {
+                        let mut remote_str: String = String::with_capacity(remote_size);
+                        for byte in &data[curr_index..final_index] {
+                            remote_str.push(*byte as char);
+                        }
+                        remote = Some(remote_str);
+                    } else {
+                        remote = None
+                    }
+                    curr_index = final_index;
+                    //TTL
+                    let ttl: u8 = *data.get(curr_index).unwrap();
+                    curr_index += 1;
+                    //Data Size
+                    let mut data_size: u64 = 0;
+                    let mut final_index = curr_index + 8;
+                    for byte in &data[curr_index..final_index] {
+                        data_size = data_size << 8;
+                        data_size += *byte as u64;
+                    }
+                    curr_index = final_index;
+                    //Options
+                    let options: OctopipesOptions =
+                        OctopipesOptions::from_u8(*data.get(curr_index).unwrap());
+                    curr_index += 1;
+                    //Checksum
+                    let checksum: u8 = *data.get(curr_index).unwrap();
+                    curr_index += 1;
+                    //STX
+                    if *data.get(curr_index).unwrap() != STX {
+                        return Err(OctopipesError::BadPacket);
+                    }
+                    curr_index += 1;
+                    //Data
+                    final_index = curr_index + (data_size as usize);
+                    //Verify if data fits
+                    if final_index >= data.len() {
+                        return Err(OctopipesError::BadPacket);
+                    }
+                    if *data.get(final_index).unwrap() != ETX {
+                        //Check if last byte is ETX
+                        return Err(OctopipesError::BadPacket);
+                    }
+                    let mut payload = Vec::with_capacity(data_size as usize);
+                    for byte in &data[curr_index..final_index] {
+                        payload.push(*byte);
+                    }
+                    //Instance OctopipesMessage
+                    let message: OctopipesMessage = OctopipesMessage::new(
+                        &version, origin, remote, ttl, options, checksum, payload,
+                    );
+                    //Verify checksum if required
+                    if !message.isset_option(OctopipesOptions::ICK) {
+                        if checksum != calculate_checksum(&message) {
+                            return Err(OctopipesError::BadChecksum);
+                        }
+                    }
+                    Ok(message)
                 }
-                origin = Some(origin_str);
-            } else {
-                origin = None
             }
-            curr_index = final_index;
-            let remote_size: usize = *data.get(curr_index).unwrap() as usize;
-            current_min_size += remote_size;
-            curr_index += 1;
-            final_index = curr_index + remote_size;
-            if data.len() < current_min_size {
-                return Err(OctopipesError::BadPacket);
-            }
-            let remote: Option<String>;
-            if remote_size > 0 {
-                let mut remote_str: String = String::with_capacity(remote_size);
-                for byte in &data[curr_index..final_index] {
-                    remote_str.push(*byte as char);
-                }
-                remote = Some(remote_str);
-            } else {
-                remote = None
-            }
-            curr_index = final_index;
-            //TTL
-            let ttl: u8 = *data.get(curr_index).unwrap();
-            curr_index += 1;
-            //Data Size
-            let mut data_size: u64 = 0;
-            let mut final_index = curr_index + 8;
-            for byte in &data[curr_index..final_index] {
-                data_size = data_size << 8;
-                data_size += *byte as u64;
-            }
-            curr_index = final_index;
-            //Options
-            let options: OctopipesOptions =
-                OctopipesOptions::from_u8(*data.get(curr_index).unwrap());
-            curr_index += 1;
-            //Checksum
-            let checksum: u8 = *data.get(curr_index).unwrap();
-            curr_index += 1;
-            //STX
-            if *data.get(curr_index).unwrap() != STX {
-                return Err(OctopipesError::BadPacket);
-            }
-            curr_index += 1;
-            //Data
-            final_index = curr_index + (data_size as usize);
-            //Verify if data fits
-            if final_index >= data.len() {
-                return Err(OctopipesError::BadPacket);
-            }
-            if *data.get(final_index).unwrap() != ETX {
-                //Check if last byte is ETX
-                return Err(OctopipesError::BadPacket);
-            }
-            let mut payload = Vec::with_capacity(data_size as usize);
-            for byte in &data[curr_index..final_index] {
-                payload.push(*byte);
-            }
-            //Instance OctopipesMessage
-            let message: OctopipesMessage =
-                OctopipesMessage::new(&version, origin, remote, ttl, options, checksum, payload);
-            //Verify checksum if required
-            if !message.isset_option(OctopipesOptions::ICK) {
-                if checksum != calculate_checksum(&message) {
-                    return Err(OctopipesError::BadChecksum);
-                }
-            }
-            Ok(message)
         }
-        _ => return Err(OctopipesError::UnsupportedVersion),
+        None => Err(OctopipesError::UnsupportedVersion),
     }
 }
 

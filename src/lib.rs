@@ -69,7 +69,6 @@ pub enum OctopipesError {
 /// ### OctopipesCapError
 ///
 /// `OctopipesCapError` describes the kind of error returned by an operation on the CAP
-
 #[derive(Copy, Clone, PartialEq)]
 pub enum OctopipesCapError {
     NoError = 0,
@@ -83,7 +82,6 @@ pub enum OctopipesCapError {
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum OctopipesCapMessage {
-    Unknown = 0x00,
     Subscribe = 0x01,
     Unsubscribe = 0x02,
     Assignment = 0xff
@@ -120,7 +118,6 @@ bitflags! {
 
 #[derive(Copy, Clone)]
 pub enum OctopipesProtocolVersion {
-    Unknown = 0,
     Version1 = 1,
 }
 
