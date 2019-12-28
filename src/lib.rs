@@ -82,8 +82,8 @@ pub enum OctopipesCapError {
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum OctopipesCapMessage {
-    Subscribe = 0x01,
-    Unsubscribe = 0x02,
+    Subscription = 0x01,
+    Unsubscription = 0x02,
     Assignment = 0xff
 }
 

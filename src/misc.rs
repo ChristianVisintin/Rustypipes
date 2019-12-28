@@ -47,8 +47,8 @@ impl OctopipesProtocolVersion {
 impl OctopipesCapMessage {
     pub(crate) fn from_u8(value: u8) -> Option<OctopipesCapMessage> {
         match value {
-            0x01 => Some(OctopipesCapMessage::Subscribe),
-            0x02 => Some(OctopipesCapMessage::Unsubscribe),
+            0x01 => Some(OctopipesCapMessage::Subscription),
+            0x02 => Some(OctopipesCapMessage::Unsubscription),
             0xff => Some(OctopipesCapMessage::Assignment),
             _ => None,
         }
@@ -56,8 +56,8 @@ impl OctopipesCapMessage {
     pub(crate) fn to_string(&self) -> &str {
         match self {
             OctopipesCapMessage::Assignment => "ASSIGNMENT",
-            OctopipesCapMessage::Subscribe => "SUBSCRIBE",
-            OctopipesCapMessage::Unsubscribe => "UNSUBSCRIBE"
+            OctopipesCapMessage::Subscription => "SUBSCRIPTION",
+            OctopipesCapMessage::Unsubscription => "UNSUBSCRIPTION"
         }
     }
 }
