@@ -46,7 +46,7 @@ impl OctopipesClient {
         cap_pipe: String,
         version: OctopipesProtocolVersion,
     ) -> OctopipesClient {
-        let client = OctopipesClient {
+        let mut client = OctopipesClient {
             id: client_id,
             version: version,
             cap_pipe: cap_pipe,
@@ -60,7 +60,6 @@ impl OctopipesClient {
             on_subscribed_fn: None,
             on_unsubscribed_fn: None,
         };
-        client.client_rc = Some(Arc::new(Mutex::new(client)));
         client
     }
 
@@ -69,14 +68,14 @@ impl OctopipesClient {
     /// ###  loop_start
     ///
     /// `loop_start` starts the client loop thread which checks if new messages are available
-    pub fn loop_start(&mut self) -> Result<(), OctopipesError> {
+    pub fn loop_start(&mut self, this: Arc<Mutex<Self>>) -> Result<(), OctopipesError> {
         match self.state {
             OctopipesState::Subscribed => {
                 //Create threaded client
                 if self.client_rc.is_none() {
-                    return Err(OctopipesError::ThreadError)
+                    self.client_rc = Some(this);
                 }
-                let this = Arc::clone(&self.client_rc.unwrap());
+                let this = Arc::clone(&self.client_rc.as_ref().unwrap());
                 self.client_loop = Some(thread::spawn(move || {
                     //TODO: implement thread
                     loop {
