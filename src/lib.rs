@@ -31,6 +31,7 @@ pub mod message;
 pub(crate) mod misc;
 mod pipes;
 mod serializer;
+pub mod server;
 
 use std::thread;
 
@@ -84,7 +85,7 @@ pub enum OctopipesCapError {
 pub enum OctopipesCapMessage {
     Subscription = 0x01,
     Unsubscription = 0x02,
-    Assignment = 0xff
+    Assignment = 0xff,
 }
 
 /// ### OctopipesState
@@ -164,15 +165,36 @@ pub struct OctopipesClient {
 pub struct OctopipesServer {
     //Server params
     version: OctopipesProtocolVersion,
+    //Subscription list
     //Pipe
     cap_pipe: String,
     //Thread
     cap_listener: Option<thread::JoinHandle<()>>,
-    //TODO: add workers
+    //workers
+    workers: Vec<OctopipesServerWorker>,
     //Callbacks
-    on_cap_message_fn: fn(Result<&OctopipesMessage, &OctopipesError>)
+    on_cap_message_fn: fn(Result<&OctopipesMessage, &OctopipesError>),
+    on_receive: fn(Result<&OctopipesMessage, &OctopipesError>),
 }
 
+/// ### OctopipesServerWorker
+///
+/// `OctopipesServerWorker` is a container for an Octopipes Server worker (a client handler)
 struct OctopipesServerWorker {
-    
+    //Associated client
+    client_id: String,
+    subscription: Subscription,
+    //Pipes
+    pipe_read: String,  //TX Pipe of the client
+    pipe_write: String, //RX Pipe of the client
+    //Join handle
+    worker_loop: thread::JoinHandle<()>,
+}
+
+/// ### Subscription
+///
+/// `Subscription` is a struct which stores the data for a single subscription from a client
+struct Subscription {
+    subscription_time: std::time::SystemTime,
+    groups: Vec<String>,
 }
