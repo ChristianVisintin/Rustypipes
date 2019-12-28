@@ -150,6 +150,7 @@ pub struct OctopipesClient {
     //State
     state: OctopipesState,
     //Thread
+    client_rc: Option<std::sync::Arc<std::sync::Mutex<Self>>>,
     client_loop: Option<thread::JoinHandle<()>>,
     //Callbacks
     on_received_fn: Option<fn(&OctopipesClient, Result<&OctopipesMessage, &OctopipesError>)>,
