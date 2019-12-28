@@ -189,6 +189,33 @@ impl OctopipesClient {
         let mut client = self.this.lock().unwrap();
         client.on_unsubscribed_fn = Some(callback);
     }
+
+    //@! Getters
+    pub fn get_id(&self) -> String {
+        let client = self.this.lock().unwrap();
+        client.id.clone()
+    }
+
+    pub fn get_cap(&self) -> String {
+        let client = self.this.lock().unwrap();
+        client.cap_pipe.clone()
+    }
+
+    pub fn get_pipe_tx(&self) -> Option<String> {
+        let client = self.this.lock().unwrap();
+        match client.tx_pipe {
+            Some(ref pipe) => Some(pipe.clone()),
+            None => None
+        }
+    }
+
+    pub fn get_pipe_rx(&self) -> Option<String> {
+        let client = self.this.lock().unwrap();
+        match client.rx_pipe {
+            Some(ref pipe) => Some(pipe.clone()),
+            None => None
+        }
+    }
 }
 
 impl Client {

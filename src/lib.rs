@@ -34,6 +34,7 @@ mod serializer;
 pub mod server;
 
 use std::thread;
+use std::sync::{Arc, Mutex};
 
 #[macro_use]
 extern crate bitflags;
@@ -140,7 +141,7 @@ pub struct OctopipesMessage {
 /// `OctopipesClient` is a container for an Octopipes Client
 
 pub struct OctopipesClient {
-    this: std::sync::Arc<std::sync::Mutex<Client>>
+    this: Arc<Mutex<Client>>
 }
 
 struct Client {
