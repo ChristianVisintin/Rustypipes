@@ -26,6 +26,7 @@
 // SOFTWARE.
 //
 
+use super::Client;
 use super::OctopipesCapError;
 use super::OctopipesClient;
 use super::OctopipesError;
@@ -40,27 +41,15 @@ use std::thread;
 impl OctopipesClient {
     /// ### OctopipesClient Constructor
     ///
-    /// `new` is constructor for OctopipesClient
+    /// `new` is constructor for OctopipesClient. OctopipesClient is actually a wrapper for a Client
     pub fn new(
         client_id: String,
         cap_pipe: String,
         version: OctopipesProtocolVersion,
     ) -> OctopipesClient {
-        let mut client = OctopipesClient {
-            id: client_id,
-            version: version,
-            cap_pipe: cap_pipe,
-            tx_pipe: None,
-            rx_pipe: None,
-            state: OctopipesState::Initialized,
-            client_rc: None,
-            client_loop: None,
-            on_received_fn: None,
-            on_sent_fn: None,
-            on_subscribed_fn: None,
-            on_unsubscribed_fn: None,
-        };
-        client
+        OctopipesClient {
+            this: Arc::new(Mutex::new(Client::new(client_id, cap_pipe, version))),
+        }
     }
 
     //Thread operations
@@ -68,18 +57,16 @@ impl OctopipesClient {
     /// ###  loop_start
     ///
     /// `loop_start` starts the client loop thread which checks if new messages are available
-    pub fn loop_start(&mut self, this: Arc<Mutex<Self>>) -> Result<(), OctopipesError> {
-        match self.state {
+    pub fn loop_start(&mut self) -> Result<(), OctopipesError> {
+        let mut client = self.this.lock().unwrap();
+        match client.state {
             OctopipesState::Subscribed => {
                 //Create threaded client
-                if self.client_rc.is_none() {
-                    self.client_rc = Some(this);
-                }
-                let this = Arc::clone(&self.client_rc.as_ref().unwrap());
-                self.client_loop = Some(thread::spawn(move || {
+                let this_rc = Arc::clone(&self.this);
+                client.client_loop = Some(thread::spawn(move || {
                     //TODO: implement thread
                     loop {
-                        let client = this.lock().unwrap();
+                        let client = this_rc.lock().unwrap();
                         if client.state != OctopipesState::Running {
                             break;
                         }
@@ -88,7 +75,7 @@ impl OctopipesClient {
                     //Exit
                 }));
                 //Set state to running
-                self.state = OctopipesState::Running;
+                client.state = OctopipesState::Running;
                 Ok(())
             }
             OctopipesState::Running => Err(OctopipesError::ThreadAlreadyRunning),
@@ -101,12 +88,13 @@ impl OctopipesClient {
     /// `loop_stop` stops the client loop thread
     /// ```
     pub fn loop_stop(&mut self) -> Result<(), OctopipesError> {
-        match self.state {
+        let mut client = self.this.lock().unwrap();
+        match client.state {
             OctopipesState::Running => {
                 //Stop thread
-                self.state = OctopipesState::Stopped;
+                client.state = OctopipesState::Stopped;
                 //Take joinable out of Option and then Join thread (NOTE: Using take prevents errors!)
-                self.client_loop.take().map(thread::JoinHandle::join);
+                client.client_loop.take().map(thread::JoinHandle::join);
                 Ok(())
             }
             _ => Ok(()),
@@ -125,6 +113,7 @@ impl OctopipesClient {
         mut cap_error: &OctopipesCapError,
     ) -> Result<(), OctopipesError> {
         //TODO: implement
+        let mut client = self.this.lock().unwrap();
         Err(OctopipesError::Unknown)
     }
 
@@ -134,6 +123,7 @@ impl OctopipesClient {
 
     pub fn unsubscribe(&mut self) -> Result<(), OctopipesError> {
         //TODO: implement
+        let mut client = self.this.lock().unwrap();
         Err(OctopipesError::Unknown)
     }
 
@@ -159,6 +149,7 @@ impl OctopipesClient {
         options: OctopipesOptions,
     ) -> Result<(), OctopipesError> {
         //TODO: implement
+        let mut client = self.this.lock().unwrap();
         Err(OctopipesError::Unknown)
     }
 
@@ -171,36 +162,62 @@ impl OctopipesClient {
         &mut self,
         callback: fn(&OctopipesClient, Result<&OctopipesMessage, &OctopipesError>),
     ) {
-        self.on_received_fn = Some(callback);
+        let mut client = self.this.lock().unwrap();
+        client.on_received_fn = Some(callback);
     }
 
     /// ###  set_on_sent_callbacl
     ///
     /// `set_on_sent_callbacl` sets the function to call when a message is sent
     pub fn set_on_sent_callback(&mut self, callback: fn(&OctopipesClient, &OctopipesMessage)) {
-        self.on_sent_fn = Some(callback);
+        let mut client = self.this.lock().unwrap();
+        client.on_sent_fn = Some(callback);
     }
 
     /// ###  set_on_subscribed
     ///
     /// `set_on_subscribed` sets the function to call on a successful subscription to the Octopipes Server
     pub fn set_on_subscribed(&mut self, callback: fn(&OctopipesClient)) {
-        self.on_subscribed_fn = Some(callback);
+        let mut client = self.this.lock().unwrap();
+        client.on_subscribed_fn = Some(callback);
     }
 
     /// ###  set_on_unsubscribed
     ///
     /// `set_on_unsubscribed` sets the function to call on a successful unsubscription from Octopipes server
     pub fn set_on_unsubscribed(&mut self, callback: fn(&OctopipesClient)) {
-        self.on_unsubscribed_fn = Some(callback);
+        let mut client = self.this.lock().unwrap();
+        client.on_unsubscribed_fn = Some(callback);
     }
+}
 
+impl Client {
+    /// ### OctopipesClient Constructor
+    ///
+    /// `new` is constructor for OctopipesClient
+    fn new(client_id: String, cap_pipe: String, version: OctopipesProtocolVersion) -> Client {
+        Client {
+            id: client_id,
+            version: version,
+            cap_pipe: cap_pipe,
+            tx_pipe: None,
+            rx_pipe: None,
+            state: OctopipesState::Initialized,
+            client_loop: None,
+            on_received_fn: None,
+            on_sent_fn: None,
+            on_subscribed_fn: None,
+            on_unsubscribed_fn: None,
+        }
+    }
 }
 
 impl Drop for OctopipesClient {
-    fn drop(&mut self) {       
+    fn drop(&mut self) {
         //Stop thread
-        self.loop_stop();
-        drop(self);
+        match self.loop_stop() {
+            Ok(_) => drop(self),
+            Err(error) => panic!(error), //Don't worry, it won't panic
+        }
     }
 }

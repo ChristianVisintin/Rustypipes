@@ -140,6 +140,10 @@ pub struct OctopipesMessage {
 /// `OctopipesClient` is a container for an Octopipes Client
 
 pub struct OctopipesClient {
+    this: std::sync::Arc<std::sync::Mutex<Client>>
+}
+
+struct Client {
     //Client params
     id: String,
     version: OctopipesProtocolVersion,
@@ -150,13 +154,12 @@ pub struct OctopipesClient {
     //State
     state: OctopipesState,
     //Thread
-    client_rc: Option<std::sync::Arc<std::sync::Mutex<Self>>>,
     client_loop: Option<thread::JoinHandle<()>>,
     //Callbacks
     on_received_fn: Option<fn(&OctopipesClient, Result<&OctopipesMessage, &OctopipesError>)>,
     on_sent_fn: Option<fn(&OctopipesClient, &OctopipesMessage)>,
     on_subscribed_fn: Option<fn(&OctopipesClient)>,
-    on_unsubscribed_fn: Option<fn(&OctopipesClient)>,
+    on_unsubscribed_fn: Option<fn(&OctopipesClient)>
 }
 
 /// ### OctopipesServer
