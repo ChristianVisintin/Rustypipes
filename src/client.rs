@@ -74,10 +74,12 @@ impl OctopipesClient {
                         if client.state != OctopipesState::Running {
                             break;
                         }
-                        //Try to read
-                        match pipes::pipe_read(&client.rx_pipe.as_ref().unwrap(), 5000) {
+                        //Try to read (Read for 200 ms and sleep for 100ms)
+                        match pipes::pipe_read(&client.rx_pipe.as_ref().unwrap(), 200) {
                             Ok(data) => {
                                 if data.len() == 0 {
+                                    drop(client);
+                                    thread::sleep(std::time::Duration::from_millis(100));
                                     continue; //Just go on
                                 }
                                 //Otherwise parse message and send to callback
@@ -85,7 +87,35 @@ impl OctopipesClient {
                                     Ok(message) => {
                                         //If message has ACK, send ACK back
                                         if message.options.intersects(OctopipesOptions::RCK) {
-                                            //TODO: RCK is set, send ACK back
+                                            //if RCK is set, send ACK back
+                                            let message_origin: Option<String> =
+                                                match message.origin.as_ref() {
+                                                    Some(origin) => Some(origin.clone()),
+                                                    None => None,
+                                                };
+                                            //Prepare message
+                                            let mut message: OctopipesMessage =
+                                                OctopipesMessage::new(
+                                                    &client.version,
+                                                    &Some(client.id.clone()),
+                                                    &message_origin,
+                                                    message.ttl,
+                                                    OctopipesOptions::ACK,
+                                                    0,
+                                                    vec![],
+                                                );
+                                            //Encode message
+                                            match serializer::encode_message(&mut message) {
+                                                Ok(data_out) => {
+                                                    //Write message to CAP
+                                                    let _ = pipes::pipe_write(
+                                                        &client.tx_pipe.as_ref().unwrap(),
+                                                        5000,
+                                                        data_out,
+                                                    );
+                                                }
+                                                Err(..) => { /*Ignore error*/ }
+                                            }
                                         }
                                         //Call callback
                                         match client.on_received_fn {
@@ -111,6 +141,8 @@ impl OctopipesClient {
                                 None => {}
                             },
                         }
+                        drop(client); //Free lock
+                        thread::sleep(std::time::Duration::from_millis(100));
                     }
                     //Exit
                 }));
@@ -151,13 +183,13 @@ impl OctopipesClient {
         &mut self,
         subscription_list: &Vec<String>,
     ) -> Result<OctopipesCapError, OctopipesError> {
-        let mut client = self.this.lock().unwrap();
         //Prepare subscribe message
         let payload: Vec<u8> = cap::encode_subscribption(subscription_list);
         //Send message through the CAP
         match self.send_cap(payload) {
             Err(err) => Err(err),
             Ok(..) => {
+                let mut client = self.this.lock().unwrap();
                 //Wait for ASSIGNMENT
                 match pipes::pipe_read(&client.cap_pipe, 5000) {
                     Err(..) => Err(OctopipesError::ReadFailed),
@@ -244,15 +276,43 @@ impl OctopipesClient {
     /// `send_cap` sends a message to server through the CAP
 
     fn send_cap(&self, payload: Vec<u8>) -> Result<(), OctopipesError> {
-        //TODO: implement
-        Err(OctopipesError::CapTimeout)
+        let version: OctopipesProtocolVersion;
+        let cap_path: String;
+        let origin: String;
+        {
+            let client = &mut self.this.lock().unwrap();
+            version = client.version;
+            cap_path = client.cap_pipe.clone();
+            origin = client.id.clone();
+        }
+        //Prepare message
+        let mut message: OctopipesMessage = OctopipesMessage::new(
+            &version,
+            &Some(origin),
+            &None,
+            0,
+            OctopipesOptions::empty(),
+            0,
+            payload,
+        );
+        //Encode message
+        match serializer::encode_message(&mut message) {
+            Ok(data_out) => {
+                //Write message to cap
+                match pipes::pipe_write(&cap_path, 5000, data_out) {
+                    Ok(..) => Ok(()),
+                    Err(..) => Err(OctopipesError::WriteFailed),
+                }
+            }
+            Err(err) => Err(err),
+        }
     }
 
     /// ###  send
     ///
     /// `send` sends a message to a certain remote
 
-    pub fn send(&self, remote: &String, data: &Vec<u8>) -> Result<(), OctopipesError> {
+    pub fn send(&self, remote: &String, data: Vec<u8>) -> Result<(), OctopipesError> {
         self.send_ex(remote, data, 0, OctopipesOptions::empty())
     }
 
@@ -263,13 +323,56 @@ impl OctopipesClient {
     pub fn send_ex(
         &self,
         remote: &String,
-        data: &Vec<u8>,
+        data: Vec<u8>,
         ttl: u8,
         options: OctopipesOptions,
     ) -> Result<(), OctopipesError> {
-        //TODO: implement
-        let mut client = self.this.lock().unwrap();
-        Err(OctopipesError::Unknown)
+        let version: OctopipesProtocolVersion;
+        let tx_pipe: String;
+        let origin: String;
+        {
+            let client = self.this.lock().unwrap();
+            if client.state != OctopipesState::Running && client.state != OctopipesState::Subscribed
+            {
+                return Err(OctopipesError::NotSubscribed);
+            }
+            if client.tx_pipe.as_ref().is_none() {
+                return Err(OctopipesError::NotSubscribed);
+            }
+            version = client.version;
+            tx_pipe = client.tx_pipe.as_ref().unwrap().clone();
+            origin = client.id.clone();
+        }
+        //Prepare message
+        let mut message: OctopipesMessage = OctopipesMessage::new(
+            &version,
+            &Some(origin),
+            &Some(remote.clone()),
+            ttl,
+            options,
+            0,
+            data,
+        );
+        //Encode message
+        match serializer::encode_message(&mut message) {
+            Ok(data_out) => {
+                //Write message to cap
+                match pipes::pipe_write(&tx_pipe, 5000, data_out) {
+                    Ok(..) => {
+                        //If on sent callback is set, call on sent
+                        {
+                            let client = self.this.lock().unwrap();
+                            if client.on_sent_fn.as_ref().is_some() {
+                                (client.on_sent_fn.as_ref().unwrap())(&message);
+                            }
+                        }
+                        Ok(())
+                    }
+                    Err(..) => Err(OctopipesError::WriteFailed),
+                }
+            }
+            Err(err) => Err(err),
+        }
     }
 
     //Callbacks setters

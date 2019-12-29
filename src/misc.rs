@@ -30,7 +30,6 @@ use super::OctopipesCapMessage;
 use super::OctopipesError;
 use super::OctopipesProtocolVersion;
 use super::OctopipesOptions;
-use super::OctopipesState;
 
 use std::fmt;
 

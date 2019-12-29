@@ -124,7 +124,6 @@ pub(super) fn encode_message(message: &mut OctopipesMessage) -> Result<Vec<u8>, 
             }
             Ok(data_out)
         }
-        _ => Err(OctopipesError::UnsupportedVersion), //Return Unsupported Version
     }
 }
 
@@ -288,7 +287,6 @@ fn calculate_checksum(message: &OctopipesMessage) -> u8 {
             //Checksum with ETX
             checksum = checksum ^ ETX;
         }
-        _ => return 0,
     }
     checksum
 }
