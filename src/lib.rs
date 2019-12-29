@@ -34,7 +34,7 @@ mod serializer;
 pub mod server;
 
 use std::thread;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 
 #[macro_use]
 extern crate bitflags;
@@ -163,22 +163,32 @@ struct Client {
     on_unsubscribed_fn: Option<fn()>
 }
 
+//@! Server
+
 /// ### OctopipesServer
 ///
 /// `OctopipesServer` is a container for an Octopipes Server
 pub struct OctopipesServer {
     //Server params
     version: OctopipesProtocolVersion,
-    //Subscription list
+    state: Arc<Mutex<OctopipesServerState>>,
     //Pipe
     cap_pipe: String,
     //Thread
     cap_listener: Option<thread::JoinHandle<()>>,
+    cap_receiver: Option<mpsc::Receiver<()>>, //Receives OctopipesMessage from clients; responses are sent through methods
     //workers
-    workers: Vec<OctopipesServerWorker>,
+    workers: Vec<OctopipesServerWorkerWrapper>,
     //Callbacks
-    on_cap_message_fn: fn(Result<&OctopipesMessage, &OctopipesError>),
     on_receive: fn(Result<&OctopipesMessage, &OctopipesError>),
+}
+
+/// ### OctopipesServerWorkerWrapper
+///
+/// `OctopipesServerWorkerWrapper` is a wrapper for an Octopipes Server worker (a client handler) (used for threads)
+
+struct OctopipesServerWorkerWrapper {
+    this: Arc<Mutex<OctopipesServerWorker>>
 }
 
 /// ### OctopipesServerWorker
@@ -201,4 +211,15 @@ struct OctopipesServerWorker {
 struct Subscription {
     subscription_time: std::time::SystemTime,
     groups: Vec<String>,
+}
+
+/// ### OctopipesServerState
+///
+/// `OctopipesServerState` describes the current state of the OctopipesServer
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum OctopipesServerState {
+    Initialized,
+    Running,
+    Stopped
 }
