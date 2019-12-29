@@ -33,8 +33,8 @@ mod pipes;
 mod serializer;
 pub mod server;
 
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::sync::{Arc, Mutex, mpsc};
 
 #[macro_use]
 extern crate bitflags;
@@ -157,7 +157,7 @@ pub struct OctopipesClient {
     on_received_fn: Option<fn(Result<&OctopipesMessage, &OctopipesError>)>,
     on_sent_fn: Option<fn(&OctopipesMessage)>,
     on_subscribed_fn: Option<fn()>,
-    on_unsubscribed_fn: Option<fn()>
+    on_unsubscribed_fn: Option<fn()>,
 }
 
 //@! Server
@@ -173,19 +173,9 @@ pub struct OctopipesServer {
     cap_pipe: String,
     //Thread
     cap_listener: Option<thread::JoinHandle<()>>,
-    cap_receiver: Option<mpsc::Receiver<()>>, //Receives OctopipesMessage from clients; responses are sent through methods
+    cap_receiver: Option<mpsc::Receiver<(Result<OctopipesMessage, OctopipesError>)>>, //Receives OctopipesMessage from clients; responses are sent through methods
     //workers
-    workers: Vec<OctopipesServerWorkerWrapper>,
-    //Callbacks
-    on_receive: fn(Result<&OctopipesMessage, &OctopipesError>),
-}
-
-/// ### OctopipesServerWorkerWrapper
-///
-/// `OctopipesServerWorkerWrapper` is a wrapper for an Octopipes Server worker (a client handler) (used for threads)
-
-struct OctopipesServerWorkerWrapper {
-    this: Arc<Mutex<OctopipesServerWorker>>
+    workers: Vec<OctopipesServerWorker>
 }
 
 /// ### OctopipesServerWorker
@@ -198,8 +188,11 @@ struct OctopipesServerWorker {
     //Pipes
     pipe_read: String,  //TX Pipe of the client
     pipe_write: String, //RX Pipe of the client
-    //Join handle
+    //Thread stuff
     worker_loop: thread::JoinHandle<()>,
+    worker_active: Arc<Mutex<bool>>, //When set to false, the worker must terminate
+    sender: mpsc::Sender<(Result<OctopipesMessage, OctopipesError>)>,
+    receiver: mpsc::Receiver<(Result<OctopipesMessage, OctopipesError>)>,
 }
 
 /// ### Subscription
@@ -216,7 +209,8 @@ struct Subscription {
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum OctopipesServerState {
-    Initialized,
-    Running,
-    Stopped
+    Initialized, //Initialized
+    Running, //CAP listener running and reading
+    Block, //Block CAP read because busy for write
+    Stopped, //CAP listeners must terminate
 }

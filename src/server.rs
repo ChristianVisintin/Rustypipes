@@ -35,14 +35,13 @@ use super::OctopipesProtocolVersion;
 use super::OctopipesServer;
 use super::OctopipesServerState;
 use super::OctopipesServerWorker;
-use super::OctopipesServerWorkerWrapper;
 use super::Subscription;
 
 use super::cap;
 use super::pipes;
 use super::serializer;
 
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -50,15 +49,14 @@ impl OctopipesServer {
     /// ###  new
     ///
     /// `new` instances a new OctopipesServer
-    pub fn new(version: OctopipesProtocolVersion, cap_pipe: String, on_recv_cb: fn(Result<&OctopipesMessage, &OctopipesError>)) -> OctopipesServer {
+    pub fn new(version: OctopipesProtocolVersion, cap_pipe: String) -> OctopipesServer {
         OctopipesServer {
             version: version,
             state: Arc::new(Mutex::new(OctopipesServerState::Initialized)),
             cap_pipe: cap_pipe,
             cap_receiver: None,
-            on_receive: on_recv_cb,
             cap_listener: None,
-            workers: Vec::new()
+            workers: Vec::new(),
         }
     }
 
@@ -68,7 +66,7 @@ impl OctopipesServer {
     pub fn start_cap_listener(&mut self) -> Result<(), OctopipesError> {
         //Check if thread is already running
         if self.cap_listener.is_some() {
-            return Err(OctopipesError::ThreadAlreadyRunning)
+            return Err(OctopipesError::ThreadAlreadyRunning);
         }
         //Create CAP copy
         let cap_pipe: String = self.cap_pipe.clone();
@@ -86,21 +84,46 @@ impl OctopipesServer {
         let (cap_sender, cap_receiver) = mpsc::channel();
         self.cap_receiver = Some(cap_receiver);
         self.cap_listener = Some(thread::spawn(move || {
-            loop {
+            let mut terminate_thread: bool = false;
+            while !terminate_thread {
                 {
                     let current_server_state = server_state_clone.lock().unwrap();
                     //If state is not Runnning, exit
-                    if *current_server_state != OctopipesServerState::Running {
-                        break;
+                    match *current_server_state {
+                        OctopipesServerState::Block => {
+                            //Keep iterating
+                            drop(current_server_state); //Allow main thread to change state
+                            thread::sleep(Duration::from_millis(100));
+                            continue;
+                        }
+                        OctopipesServerState::Running => {}
+                        _ => {
+                            terminate_thread = true;
+                            continue;
+                        }
                     }
                 }
                 //Listen on CAP
-                if let Ok(data_in) = pipes::pipe_read(&cap_pipe, 5000) {
+                if let Ok(data_in) = pipes::pipe_read(&cap_pipe, 500) {
                     if data_in.len() == 0 {
-                        thread::sleep(Duration::from_millis(200));
+                        thread::sleep(Duration::from_millis(100));
                         continue;
                     }
                     //Parse message
+                    match serializer::decode_message(data_in) {
+                        Err(err) => {
+                            if let Err(_) = cap_sender.send(Err(err)) {
+                                break; //Terminate thread
+                            }
+                        }
+                        Ok(message) => {
+                            //Send CAP message
+                            if let Err(_) = cap_sender.send(Ok(message)) {
+                                break; //Terminate thread
+                            }
+                        }
+                    }
+                    thread::sleep(Duration::from_millis(100));
                 }
             }
         }));

@@ -88,11 +88,12 @@ impl OctopipesClient {
                 let (client_sender, client_receiver) = mpsc::channel();
                 self.client_receiver = Some(client_receiver);
                 self.client_loop = Some(thread::spawn(move || {
-                    loop {
+                    let mut terminate_thread: bool = false;
+                    while !terminate_thread {
                         {
                             let current_state = this_state_rc.lock().unwrap();
                             if *current_state != OctopipesState::Running {
-                                break;
+                                terminate_thread = true;
                             }
                         }
                         //Try to read (Read for 500 ms and sleep for 100ms)
