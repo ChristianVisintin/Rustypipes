@@ -26,7 +26,6 @@
 // SOFTWARE.
 //
 
-use super::Client;
 use super::OctopipesCapError;
 use super::OctopipesCapMessage;
 use super::OctopipesClient;
@@ -36,7 +35,7 @@ use super::OctopipesOptions;
 use super::OctopipesProtocolVersion;
 use super::OctopipesState;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
 use super::cap;
@@ -53,7 +52,18 @@ impl OctopipesClient {
         version: OctopipesProtocolVersion,
     ) -> OctopipesClient {
         OctopipesClient {
-            this: Arc::new(Mutex::new(Client::new(client_id, cap_pipe, version))),
+            id: client_id,
+            version: version,
+            cap_pipe: cap_pipe,
+            tx_pipe: None,
+            rx_pipe: None,
+            state: Arc::new(Mutex::new(OctopipesState::Initialized)),
+            client_loop: None,
+            client_receiver: None,
+            on_received_fn: None,
+            on_sent_fn: None,
+            on_subscribed_fn: None,
+            on_unsubscribed_fn: None,
         }
     }
 
@@ -63,22 +73,32 @@ impl OctopipesClient {
     ///
     /// `loop_start` starts the client loop thread which checks if new messages are available
     pub fn loop_start(&mut self) -> Result<(), OctopipesError> {
-        let mut client = self.this.lock().unwrap();
-        match client.state {
+        let mut client_state = self.state.lock().unwrap();
+        match *client_state {
             OctopipesState::Subscribed => {
                 //Create threaded client
-                let this_rc = Arc::clone(&self.this);
-                client.client_loop = Some(thread::spawn(move || {
+                if self.rx_pipe.is_none() || self.tx_pipe.is_none() {
+                    return Err(OctopipesError::Uninitialized);
+                }
+                let this_state_rc = Arc::clone(&self.state);
+                let rx_pipe: String = self.rx_pipe.as_ref().unwrap().clone();
+                let tx_pipe: String = self.tx_pipe.as_ref().unwrap().clone();
+                let version: OctopipesProtocolVersion = self.version;
+                let client_id: String = self.id.clone();
+                let (client_sender, client_receiver) = mpsc::channel();
+                self.client_receiver = Some(client_receiver);
+                self.client_loop = Some(thread::spawn(move || {
                     loop {
-                        let client = this_rc.lock().unwrap();
-                        if client.state != OctopipesState::Running {
-                            break;
+                        {
+                            let current_state = this_state_rc.lock().unwrap();
+                            if *current_state != OctopipesState::Running {
+                                break;
+                            }
                         }
-                        //Try to read (Read for 200 ms and sleep for 100ms)
-                        match pipes::pipe_read(&client.rx_pipe.as_ref().unwrap(), 200) {
+                        //Try to read (Read for 500 ms and sleep for 100ms)
+                        match pipes::pipe_read(&rx_pipe, 500) {
                             Ok(data) => {
                                 if data.len() == 0 {
-                                    drop(client);
                                     thread::sleep(std::time::Duration::from_millis(100));
                                     continue; //Just go on
                                 }
@@ -96,8 +116,8 @@ impl OctopipesClient {
                                             //Prepare message
                                             let mut message: OctopipesMessage =
                                                 OctopipesMessage::new(
-                                                    &client.version,
-                                                    &Some(client.id.clone()),
+                                                    &version,
+                                                    &Some(client_id.clone()),
                                                     &message_origin,
                                                     message.ttl,
                                                     OctopipesOptions::ACK,
@@ -108,46 +128,37 @@ impl OctopipesClient {
                                             match serializer::encode_message(&mut message) {
                                                 Ok(data_out) => {
                                                     //Write message to CAP
-                                                    let _ = pipes::pipe_write(
-                                                        &client.tx_pipe.as_ref().unwrap(),
-                                                        5000,
-                                                        data_out,
-                                                    );
+                                                    let _ =
+                                                        pipes::pipe_write(&tx_pipe, 5000, data_out);
                                                 }
                                                 Err(..) => { /*Ignore error*/ }
                                             }
                                         }
-                                        //Call callback
-                                        match client.on_received_fn {
-                                            Some(on_received) => {
-                                                (on_received)(Ok(&message));
-                                            }
-                                            None => {}
+                                        //Send message
+                                        if let Err(_) = client_sender.send(Ok(message)) {
+                                            break; //Terminate thread
                                         }
-                                        drop(message);
                                     }
-                                    Err(err) => match client.on_received_fn {
-                                        Some(on_received) => {
-                                            (on_received)(Err(&err));
+                                    Err(err) => {
+                                        if let Err(_) = client_sender.send(Err(err)) {
+                                            break; //Terminate thread
                                         }
-                                        None => {}
-                                    },
+                                    }
                                 }
                             }
-                            Err(_) => match client.on_received_fn {
-                                Some(on_received) => {
-                                    (on_received)(Err(&OctopipesError::ReadFailed));
+                            Err(_) => {
+                                if let Err(_) = client_sender.send(Err(OctopipesError::ReadFailed))
+                                {
+                                    break; //Terminate thread
                                 }
-                                None => {}
-                            },
+                            }
                         }
-                        drop(client); //Free lock
-                        thread::sleep(std::time::Duration::from_millis(100));
                     }
+                    thread::sleep(std::time::Duration::from_millis(100));
                     //Exit
                 }));
                 //Set state to running
-                client.state = OctopipesState::Running;
+                *client_state = OctopipesState::Running;
                 Ok(())
             }
             OctopipesState::Running => Err(OctopipesError::ThreadAlreadyRunning),
@@ -160,13 +171,13 @@ impl OctopipesClient {
     /// `loop_stop` stops the client loop thread
     /// ```
     pub fn loop_stop(&mut self) -> Result<(), OctopipesError> {
-        let mut client = self.this.lock().unwrap();
-        match client.state {
+        let mut client_state = self.state.lock().unwrap();
+        match *client_state {
             OctopipesState::Running => {
                 //Stop thread
-                client.state = OctopipesState::Stopped;
+                *client_state = OctopipesState::Stopped;
                 //Take joinable out of Option and then Join thread (NOTE: Using take prevents errors!)
-                client.client_loop.take().map(thread::JoinHandle::join);
+                self.client_loop.take().map(thread::JoinHandle::join);
                 Ok(())
             }
             _ => Ok(()),
@@ -189,9 +200,8 @@ impl OctopipesClient {
         match self.send_cap(payload) {
             Err(err) => Err(err),
             Ok(..) => {
-                let mut client = self.this.lock().unwrap();
                 //Wait for ASSIGNMENT
-                match pipes::pipe_read(&client.cap_pipe, 5000) {
+                match pipes::pipe_read(&self.cap_pipe, 5000) {
                     Err(..) => Err(OctopipesError::ReadFailed),
                     Ok(data_in) => {
                         //Parse message
@@ -211,8 +221,11 @@ impl OctopipesClient {
                                                         if cap_error != OctopipesCapError::NoError {
                                                             return Ok(cap_error);
                                                         }
-                                                        client.tx_pipe = pipe_tx;
-                                                        client.rx_pipe = pipe_rx;
+                                                        self.tx_pipe = pipe_tx;
+                                                        self.rx_pipe = pipe_rx;
+                                                        let mut client_state =
+                                                            self.state.lock().unwrap();
+                                                        *client_state = OctopipesState::Subscribed;
                                                         Ok(OctopipesCapError::NoError)
                                                     }
                                                     Err(err) => Err(err),
@@ -237,8 +250,9 @@ impl OctopipesClient {
 
     pub fn unsubscribe(&mut self) -> Result<(), OctopipesError> {
         {
-            let client = &mut self.this.lock().unwrap();
-            if client.state != OctopipesState::Subscribed && client.state != OctopipesState::Running
+            let client_state = self.state.lock().unwrap();
+            if *client_state != OctopipesState::Subscribed
+                && *client_state != OctopipesState::Running
             {
                 return Err(OctopipesError::NotSubscribed);
             }
@@ -255,17 +269,15 @@ impl OctopipesClient {
             Err(err) => return Err(err),
         }
         //Call on unsubscribed
-        {
-            let client = &mut self.this.lock().unwrap();
-            match client.on_unsubscribed_fn {
-                Some(on_unsub) => {
-                    (on_unsub)();
-                }
-                None => {}
+        match self.on_unsubscribed_fn {
+            Some(on_unsub) => {
+                (on_unsub)();
             }
-            //Set state to UNSUBSCRIBED
-            client.state = OctopipesState::Unsubscribed;
+            None => {}
         }
+        //Set state to UNSUBSCRIBED
+        let mut client_state = self.state.lock().unwrap();
+        *client_state = OctopipesState::Unsubscribed;
         Ok(())
     }
 
@@ -276,19 +288,10 @@ impl OctopipesClient {
     /// `send_cap` sends a message to server through the CAP
 
     fn send_cap(&self, payload: Vec<u8>) -> Result<(), OctopipesError> {
-        let version: OctopipesProtocolVersion;
-        let cap_path: String;
-        let origin: String;
-        {
-            let client = &mut self.this.lock().unwrap();
-            version = client.version;
-            cap_path = client.cap_pipe.clone();
-            origin = client.id.clone();
-        }
         //Prepare message
         let mut message: OctopipesMessage = OctopipesMessage::new(
-            &version,
-            &Some(origin),
+            &self.version,
+            &Some(self.id.clone()),
             &None,
             0,
             OctopipesOptions::empty(),
@@ -299,7 +302,7 @@ impl OctopipesClient {
         match serializer::encode_message(&mut message) {
             Ok(data_out) => {
                 //Write message to cap
-                match pipes::pipe_write(&cap_path, 5000, data_out) {
+                match pipes::pipe_write(&self.cap_pipe, 5000, data_out) {
                     Ok(..) => Ok(()),
                     Err(..) => Err(OctopipesError::WriteFailed),
                 }
@@ -327,26 +330,21 @@ impl OctopipesClient {
         ttl: u8,
         options: OctopipesOptions,
     ) -> Result<(), OctopipesError> {
-        let version: OctopipesProtocolVersion;
-        let tx_pipe: String;
-        let origin: String;
         {
-            let client = self.this.lock().unwrap();
-            if client.state != OctopipesState::Running && client.state != OctopipesState::Subscribed
+            let client_state = self.state.lock().unwrap();
+            if *client_state != OctopipesState::Running
+                && *client_state != OctopipesState::Subscribed
             {
                 return Err(OctopipesError::NotSubscribed);
             }
-            if client.tx_pipe.as_ref().is_none() {
+            if self.tx_pipe.is_none() {
                 return Err(OctopipesError::NotSubscribed);
             }
-            version = client.version;
-            tx_pipe = client.tx_pipe.as_ref().unwrap().clone();
-            origin = client.id.clone();
         }
         //Prepare message
         let mut message: OctopipesMessage = OctopipesMessage::new(
-            &version,
-            &Some(origin),
+            &self.version,
+            &Some(self.id.clone()),
             &Some(remote.clone()),
             ttl,
             options,
@@ -357,13 +355,12 @@ impl OctopipesClient {
         match serializer::encode_message(&mut message) {
             Ok(data_out) => {
                 //Write message to cap
-                match pipes::pipe_write(&tx_pipe, 5000, data_out) {
+                match pipes::pipe_write(&self.tx_pipe.as_ref().unwrap(), 5000, data_out) {
                     Ok(..) => {
                         //If on sent callback is set, call on sent
                         {
-                            let client = self.this.lock().unwrap();
-                            if client.on_sent_fn.as_ref().is_some() {
-                                (client.on_sent_fn.as_ref().unwrap())(&message);
+                            if self.on_sent_fn.as_ref().is_some() {
+                                (self.on_sent_fn.as_ref().unwrap())(&message);
                             }
                         }
                         Ok(())
@@ -384,80 +381,28 @@ impl OctopipesClient {
         &mut self,
         callback: fn(Result<&OctopipesMessage, &OctopipesError>),
     ) {
-        let mut client = self.this.lock().unwrap();
-        client.on_received_fn = Some(callback);
+        self.on_received_fn = Some(callback);
     }
 
     /// ###  set_on_sent_callbacl
     ///
     /// `set_on_sent_callbacl` sets the function to call when a message is sent
     pub fn set_on_sent_callback(&mut self, callback: fn(&OctopipesMessage)) {
-        let mut client = self.this.lock().unwrap();
-        client.on_sent_fn = Some(callback);
+        self.on_sent_fn = Some(callback);
     }
 
     /// ###  set_on_subscribed
     ///
     /// `set_on_subscribed` sets the function to call on a successful subscription to the Octopipes Server
     pub fn set_on_subscribed(&mut self, callback: fn()) {
-        let mut client = self.this.lock().unwrap();
-        client.on_subscribed_fn = Some(callback);
+        self.on_subscribed_fn = Some(callback);
     }
 
     /// ###  set_on_unsubscribed
     ///
     /// `set_on_unsubscribed` sets the function to call on a successful unsubscription from Octopipes server
     pub fn set_on_unsubscribed(&mut self, callback: fn()) {
-        let mut client = self.this.lock().unwrap();
-        client.on_unsubscribed_fn = Some(callback);
-    }
-
-    //@! Getters
-    pub fn get_id(&self) -> String {
-        let client = self.this.lock().unwrap();
-        client.id.clone()
-    }
-
-    pub fn get_cap(&self) -> String {
-        let client = self.this.lock().unwrap();
-        client.cap_pipe.clone()
-    }
-
-    pub fn get_pipe_tx(&self) -> Option<String> {
-        let client = self.this.lock().unwrap();
-        match client.tx_pipe {
-            Some(ref pipe) => Some(pipe.clone()),
-            None => None,
-        }
-    }
-
-    pub fn get_pipe_rx(&self) -> Option<String> {
-        let client = self.this.lock().unwrap();
-        match client.rx_pipe {
-            Some(ref pipe) => Some(pipe.clone()),
-            None => None,
-        }
-    }
-}
-
-impl Client {
-    /// ### OctopipesClient Constructor
-    ///
-    /// `new` is constructor for OctopipesClient
-    fn new(client_id: String, cap_pipe: String, version: OctopipesProtocolVersion) -> Client {
-        Client {
-            id: client_id,
-            version: version,
-            cap_pipe: cap_pipe,
-            tx_pipe: None,
-            rx_pipe: None,
-            state: OctopipesState::Initialized,
-            client_loop: None,
-            on_received_fn: None,
-            on_sent_fn: None,
-            on_subscribed_fn: None,
-            on_unsubscribed_fn: None,
-        }
+        self.on_unsubscribed_fn = Some(callback);
     }
 }
 

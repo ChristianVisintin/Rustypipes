@@ -141,10 +141,6 @@ pub struct OctopipesMessage {
 /// `OctopipesClient` is a container for an Octopipes Client
 
 pub struct OctopipesClient {
-    this: Arc<Mutex<Client>>
-}
-
-struct Client {
     //Client params
     id: String,
     version: OctopipesProtocolVersion,
@@ -153,9 +149,10 @@ struct Client {
     tx_pipe: Option<String>,
     rx_pipe: Option<String>,
     //State
-    state: OctopipesState,
+    state: Arc<Mutex<OctopipesState>>,
     //Thread
     client_loop: Option<thread::JoinHandle<()>>,
+    client_receiver: Option<mpsc::Receiver<Result<OctopipesMessage, OctopipesError>>>, //Returns Result<&OctopipesMessage, &OctopipesError> when a message is received by the client loop
     //Callbacks
     on_received_fn: Option<fn(Result<&OctopipesMessage, &OctopipesError>)>,
     on_sent_fn: Option<fn(&OctopipesMessage)>,
