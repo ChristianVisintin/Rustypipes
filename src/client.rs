@@ -28,6 +28,7 @@
 
 use super::Client;
 use super::OctopipesCapError;
+use super::OctopipesCapMessage;
 use super::OctopipesClient;
 use super::OctopipesError;
 use super::OctopipesMessage;
@@ -37,6 +38,10 @@ use super::OctopipesState;
 
 use std::sync::{Arc, Mutex};
 use std::thread;
+
+use super::cap;
+use super::pipes;
+use super::serializer;
 
 impl OctopipesClient {
     /// ### OctopipesClient Constructor
@@ -64,13 +69,48 @@ impl OctopipesClient {
                 //Create threaded client
                 let this_rc = Arc::clone(&self.this);
                 client.client_loop = Some(thread::spawn(move || {
-                    //TODO: implement thread
                     loop {
                         let client = this_rc.lock().unwrap();
                         if client.state != OctopipesState::Running {
                             break;
                         }
-                        //TODO: read
+                        //Try to read
+                        match pipes::pipe_read(&client.rx_pipe.as_ref().unwrap(), 5000) {
+                            Ok(data) => {
+                                if data.len() == 0 {
+                                    continue; //Just go on
+                                }
+                                //Otherwise parse message and send to callback
+                                match serializer::decode_message(data) {
+                                    Ok(message) => {
+                                        //If message has ACK, send ACK back
+                                        if message.options.intersects(OctopipesOptions::RCK) {
+                                            //TODO: RCK is set, send ACK back
+                                        }
+                                        //Call callback
+                                        match client.on_received_fn {
+                                            Some(on_received) => {
+                                                (on_received)(Ok(&message));
+                                            }
+                                            None => {}
+                                        }
+                                        drop(message);
+                                    }
+                                    Err(err) => match client.on_received_fn {
+                                        Some(on_received) => {
+                                            (on_received)(Err(&err));
+                                        }
+                                        None => {}
+                                    },
+                                }
+                            }
+                            Err(_) => match client.on_received_fn {
+                                Some(on_received) => {
+                                    (on_received)(Err(&OctopipesError::ReadFailed));
+                                }
+                                None => {}
+                            },
+                        }
                     }
                     //Exit
                 }));
@@ -110,11 +150,53 @@ impl OctopipesClient {
     pub fn subscribe(
         &mut self,
         subscription_list: &Vec<String>,
-        mut cap_error: &OctopipesCapError,
-    ) -> Result<(), OctopipesError> {
-        //TODO: implement
+    ) -> Result<OctopipesCapError, OctopipesError> {
         let mut client = self.this.lock().unwrap();
-        Err(OctopipesError::Unknown)
+        //Prepare subscribe message
+        let payload: Vec<u8> = cap::encode_subscribption(subscription_list);
+        //Send message through the CAP
+        match self.send_cap(payload) {
+            Err(err) => Err(err),
+            Ok(..) => {
+                //Wait for ASSIGNMENT
+                match pipes::pipe_read(&client.cap_pipe, 5000) {
+                    Err(..) => Err(OctopipesError::ReadFailed),
+                    Ok(data_in) => {
+                        //Parse message
+                        match serializer::decode_message(data_in) {
+                            Err(err) => Err(err),
+                            Ok(response) => {
+                                //Check if message type is ASSIGNMENT
+                                match cap::get_cap_message_type(&response.data) {
+                                    Ok(message_type) => {
+                                        match message_type {
+                                            OctopipesCapMessage::Assignment => {
+                                                //Ok, is an ASSIGNMENT
+                                                //Parse assignment params
+                                                match cap::decode_assignment(&response.data) {
+                                                    Ok((cap_error, pipe_tx, pipe_rx)) => {
+                                                        //Assign params
+                                                        if cap_error != OctopipesCapError::NoError {
+                                                            return Ok(cap_error);
+                                                        }
+                                                        client.tx_pipe = pipe_tx;
+                                                        client.rx_pipe = pipe_rx;
+                                                        Ok(OctopipesCapError::NoError)
+                                                    }
+                                                    Err(err) => Err(err),
+                                                }
+                                            }
+                                            _ => Err(OctopipesError::BadPacket),
+                                        }
+                                    }
+                                    Err(err) => Err(err),
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// ###  unsubscribe
@@ -122,12 +204,49 @@ impl OctopipesClient {
     /// `unsubscribe` unsubscribe from Octopipes server; if thread is running it will be stopped
 
     pub fn unsubscribe(&mut self) -> Result<(), OctopipesError> {
-        //TODO: implement
-        let mut client = self.this.lock().unwrap();
-        Err(OctopipesError::Unknown)
+        {
+            let client = &mut self.this.lock().unwrap();
+            if client.state != OctopipesState::Subscribed && client.state != OctopipesState::Running
+            {
+                return Err(OctopipesError::NotSubscribed);
+            }
+        }
+        //Prepare message
+        let payload: Vec<u8> = cap::encode_unsubscribption();
+        match self.send_cap(payload) {
+            Err(err) => return Err(err),
+            Ok(..) => {}
+        }
+        //Stop loop
+        match self.loop_stop() {
+            Ok(..) => {}
+            Err(err) => return Err(err),
+        }
+        //Call on unsubscribed
+        {
+            let client = &mut self.this.lock().unwrap();
+            match client.on_unsubscribed_fn {
+                Some(on_unsub) => {
+                    (on_unsub)();
+                }
+                None => {}
+            }
+            //Set state to UNSUBSCRIBED
+            client.state = OctopipesState::Unsubscribed;
+        }
+        Ok(())
     }
 
     //Send message functions
+
+    /// ###  send_cap
+    ///
+    /// `send_cap` sends a message to server through the CAP
+
+    fn send_cap(&self, payload: Vec<u8>) -> Result<(), OctopipesError> {
+        //TODO: implement
+        Err(OctopipesError::CapTimeout)
+    }
 
     /// ###  send
     ///
@@ -160,7 +279,7 @@ impl OctopipesClient {
     /// `set_on_received_callback` sets the function to call on message received
     pub fn set_on_received_callback(
         &mut self,
-        callback: fn(&OctopipesClient, Result<&OctopipesMessage, &OctopipesError>),
+        callback: fn(Result<&OctopipesMessage, &OctopipesError>),
     ) {
         let mut client = self.this.lock().unwrap();
         client.on_received_fn = Some(callback);
@@ -169,7 +288,7 @@ impl OctopipesClient {
     /// ###  set_on_sent_callbacl
     ///
     /// `set_on_sent_callbacl` sets the function to call when a message is sent
-    pub fn set_on_sent_callback(&mut self, callback: fn(&OctopipesClient, &OctopipesMessage)) {
+    pub fn set_on_sent_callback(&mut self, callback: fn(&OctopipesMessage)) {
         let mut client = self.this.lock().unwrap();
         client.on_sent_fn = Some(callback);
     }
@@ -177,7 +296,7 @@ impl OctopipesClient {
     /// ###  set_on_subscribed
     ///
     /// `set_on_subscribed` sets the function to call on a successful subscription to the Octopipes Server
-    pub fn set_on_subscribed(&mut self, callback: fn(&OctopipesClient)) {
+    pub fn set_on_subscribed(&mut self, callback: fn()) {
         let mut client = self.this.lock().unwrap();
         client.on_subscribed_fn = Some(callback);
     }
@@ -185,7 +304,7 @@ impl OctopipesClient {
     /// ###  set_on_unsubscribed
     ///
     /// `set_on_unsubscribed` sets the function to call on a successful unsubscription from Octopipes server
-    pub fn set_on_unsubscribed(&mut self, callback: fn(&OctopipesClient)) {
+    pub fn set_on_unsubscribed(&mut self, callback: fn()) {
         let mut client = self.this.lock().unwrap();
         client.on_unsubscribed_fn = Some(callback);
     }
@@ -205,7 +324,7 @@ impl OctopipesClient {
         let client = self.this.lock().unwrap();
         match client.tx_pipe {
             Some(ref pipe) => Some(pipe.clone()),
-            None => None
+            None => None,
         }
     }
 
@@ -213,7 +332,7 @@ impl OctopipesClient {
         let client = self.this.lock().unwrap();
         match client.rx_pipe {
             Some(ref pipe) => Some(pipe.clone()),
-            None => None
+            None => None,
         }
     }
 }

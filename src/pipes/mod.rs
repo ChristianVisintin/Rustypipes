@@ -33,7 +33,7 @@ use std::time::{Duration, Instant};
 /// ### pipe_create
 ///
 /// `pipe_create` creates a Unix Pipe in the specified path
-fn pipe_create(path: &String) -> std::io::Result<()> {
+pub(super) fn pipe_create(path: &String) -> std::io::Result<()> {
     match unix_named_pipe::create(path, Some(0o666)) {
         Ok(..) => Ok(()),
         Err(error) => {
@@ -48,7 +48,7 @@ fn pipe_create(path: &String) -> std::io::Result<()> {
 /// ### pipe_delete
 ///
 /// `pipe_delete` deletes a Unix Pipe in the specified path
-fn pipe_delete(path: &String) -> std::io::Result<()> {
+pub(super) fn pipe_delete(path: &String) -> std::io::Result<()> {
     match std::fs::remove_file(path) {
         Ok(..) => Ok(()),
         Err(error) => Err(error),
@@ -58,7 +58,7 @@ fn pipe_delete(path: &String) -> std::io::Result<()> {
 /// ### pipe_read
 ///
 /// `pipe_read` read from pipe; Returns or if after millis nothing has been read or if there's no more data available
-fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<Vec<u8>> {
+pub(super) fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<Vec<u8>> {
     //Try open pipe
     let res = unix_named_pipe::open_read(path);
     if res.is_err() {
@@ -105,7 +105,7 @@ fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<Vec<u8>> {
 /// ### pipe_write
 ///
 /// `pipe_write` write to pipe; Returns after millis if nothing has been written or if the entire payload has been written. ErrorKind is WriteZero if there was no endpoint reading the pipe
-fn pipe_write(path: &String, timeout_millis: u128, data_out: Vec<u8>) -> std::io::Result<()> {
+pub(super) fn pipe_write(path: &String, timeout_millis: u128, data_out: Vec<u8>) -> std::io::Result<()> {
     //Try open pipe
     let t_start = Instant::now();
     let mut time_elapsed: Duration = Duration::from_millis(0);

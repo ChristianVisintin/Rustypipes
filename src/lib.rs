@@ -157,10 +157,10 @@ struct Client {
     //Thread
     client_loop: Option<thread::JoinHandle<()>>,
     //Callbacks
-    on_received_fn: Option<fn(&OctopipesClient, Result<&OctopipesMessage, &OctopipesError>)>,
-    on_sent_fn: Option<fn(&OctopipesClient, &OctopipesMessage)>,
-    on_subscribed_fn: Option<fn(&OctopipesClient)>,
-    on_unsubscribed_fn: Option<fn(&OctopipesClient)>
+    on_received_fn: Option<fn(Result<&OctopipesMessage, &OctopipesError>)>,
+    on_sent_fn: Option<fn(&OctopipesMessage)>,
+    on_subscribed_fn: Option<fn()>,
+    on_unsubscribed_fn: Option<fn()>
 }
 
 /// ### OctopipesServer

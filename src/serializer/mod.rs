@@ -39,7 +39,7 @@ const MINIMUM_SIZE_VERSION_1: usize = 17;
 /// ### encode_message
 ///
 /// `encode_message` encodes an OctopipesMessage struct to an Octopipes packet
-fn encode_message(message: &mut OctopipesMessage) -> Result<Vec<u8>, OctopipesError> {
+pub(super) fn encode_message(message: &mut OctopipesMessage) -> Result<Vec<u8>, OctopipesError> {
     //Match version
     match message.version {
         OctopipesProtocolVersion::Version1 => {
@@ -131,7 +131,7 @@ fn encode_message(message: &mut OctopipesMessage) -> Result<Vec<u8>, OctopipesEr
 /// ### decode_message
 ///
 /// `decode_message` decodes a message in bytes to an OctopipesMessage struct
-fn decode_message(data: Vec<u8>) -> Result<OctopipesMessage, OctopipesError> {
+pub(super) fn decode_message(data: Vec<u8>) -> Result<OctopipesMessage, OctopipesError> {
     let current_min_size = 2; //SOH, version
     if data.len() < current_min_size {
         return Err(OctopipesError::BadPacket);
@@ -228,7 +228,7 @@ fn decode_message(data: Vec<u8>) -> Result<OctopipesMessage, OctopipesError> {
                     }
                     //Instance OctopipesMessage
                     let message: OctopipesMessage = OctopipesMessage::new(
-                        &version, origin, remote, ttl, options, checksum, payload,
+                        &version, &origin, &remote, ttl, options, checksum, payload,
                     );
                     //Verify checksum if required
                     if !message.isset_option(OctopipesOptions::ICK) {
@@ -311,8 +311,8 @@ mod tests {
         //Prepare message
         let mut message: OctopipesMessage = OctopipesMessage::new(
             &OctopipesProtocolVersion::Version1,
-            Some(origin.clone()),
-            Some(remote.clone()),
+            &Some(origin.clone()),
+            &Some(remote.clone()),
             60,
             OctopipesOptions::RCK,
             0,
@@ -571,8 +571,8 @@ mod tests {
         //Prepare message
         let mut message: OctopipesMessage = OctopipesMessage::new(
             &OctopipesProtocolVersion::Version1,
-            Some(origin.clone()),
-            None,
+            &Some(origin.clone()),
+            &None,
             60,
             OctopipesOptions::ICK,
             0,
@@ -821,8 +821,8 @@ mod tests {
         //Prepare message
         let mut message: OctopipesMessage = OctopipesMessage::new(
             &OctopipesProtocolVersion::Version1,
-            None,
-            None,
+            &None,
+            &None,
             0,
             OctopipesOptions::empty(),
             0,

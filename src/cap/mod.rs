@@ -32,9 +32,9 @@ use super::OctopipesError;
 /// ### encode_subscribption
 ///
 /// `encode_subscribption` encodes a payload for a SUBSCRIBE CAP message
-fn encode_subscribption(groups: Vec<String>) -> Vec<u8> {
+pub(super) fn encode_subscribption(groups: &Vec<String>) -> Vec<u8> {
     let mut payload_size: usize = 2; //Minimum size
-    for group in &groups {
+    for group in groups {
         payload_size += group.len() + 1; //Group len + byte for group len
     }
     //Allocate result
@@ -43,7 +43,7 @@ fn encode_subscribption(groups: Vec<String>) -> Vec<u8> {
     //Group amount
     payload.push(groups.len() as u8);
     //Iterate over groups
-    for group in &groups {
+    for group in groups {
         //Write group size and then group
         payload.push(group.len() as u8);
         //Write group bytes
@@ -58,10 +58,10 @@ fn encode_subscribption(groups: Vec<String>) -> Vec<u8> {
 /// ### encode_assignment
 ///
 /// `encode_assignment` encodes a payload for an ASSIGNMENT CAP message
-fn encode_assignment(
+pub(super) fn encode_assignment(
     error: OctopipesCapError,
-    tx_pipe: Option<String>,
-    rx_pipe: Option<String>,
+    tx_pipe: Option<&String>,
+    rx_pipe: Option<&String>,
 ) -> Vec<u8> {
     //Calculate size
     if tx_pipe.is_some() && rx_pipe.is_some() {
@@ -100,7 +100,7 @@ fn encode_assignment(
 /// ### encode_unsubscribption
 ///
 /// `encode_unsubscribption` encodes a payload for an UNSUBSCRIBE CAP message
-fn encode_unsubscribption() -> Vec<u8> {
+pub(super) fn encode_unsubscribption() -> Vec<u8> {
     //Return payload
     vec![OctopipesCapMessage::Unsubscription as u8]
 }
@@ -108,7 +108,7 @@ fn encode_unsubscribption() -> Vec<u8> {
 /// ### get_cap_message_type
 ///
 /// `get_cap_message_type` get the message type for a CAP message
-fn get_cap_message_type(data: &Vec<u8>) -> Result<OctopipesCapMessage, OctopipesError> {
+pub(super) fn get_cap_message_type(data: &Vec<u8>) -> Result<OctopipesCapMessage, OctopipesError> {
     if data.len() == 0 {
         return Err(OctopipesError::BadPacket);
     }
@@ -124,7 +124,7 @@ fn get_cap_message_type(data: &Vec<u8>) -> Result<OctopipesCapMessage, Octopipes
 /// ### decode_subscription
 ///
 /// `decode_subscription` decode a subscribe message
-fn decode_subscription(data: &Vec<u8>) -> Result<Vec<String>, OctopipesError> {
+pub(super) fn decode_subscription(data: &Vec<u8>) -> Result<Vec<String>, OctopipesError> {
     //Size must be at least 2
     if data.len() < 2 {
         return Err(OctopipesError::BadPacket);
@@ -159,7 +159,7 @@ fn decode_subscription(data: &Vec<u8>) -> Result<Vec<String>, OctopipesError> {
 /// ### decode_assignment
 ///
 /// `decode_assignment` decode an assignment message
-fn decode_assignment(
+pub(super) fn decode_assignment(
     data: &Vec<u8>,
 ) -> Result<(OctopipesCapError, Option<String>, Option<String>), OctopipesError> {
     //Size must be at least 2
@@ -222,7 +222,7 @@ fn decode_assignment(
 /// ### decode_unsubscription
 ///
 /// `decode_unsubscription` decode an unsubscribe message
-fn decode_unsubscription(data: &Vec<u8>) -> Result<(), OctopipesError> {
+pub(super) fn decode_unsubscription(data: &Vec<u8>) -> Result<(), OctopipesError> {
     //Size must be at least 1
     if data.len() < 1 {
         return Err(OctopipesError::BadPacket);
@@ -245,7 +245,7 @@ mod tests {
         //Test subscribe payload encoding
         //We'll use two groups 'SUBSCRIBE' and 'SYSTEM'
         let payload: Vec<u8> =
-            encode_subscribption(vec![String::from("SUBSCRIBE"), String::from("SYSTEM")]);
+            encode_subscribption(&vec![String::from("SUBSCRIBE"), String::from("SYSTEM")]);
         assert_eq!(
             payload.len(),
             19,
@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn test_encode_subscribption_without_groups() {
         //Test subscribe payload encoding
-        let payload: Vec<u8> = encode_subscribption(vec![]);
+        let payload: Vec<u8> = encode_subscribption(&vec![]);
         assert_eq!(
             payload.len(),
             2,
@@ -389,8 +389,8 @@ mod tests {
         //We'll use TX pipe /tmp/pipe_tx and RX pipe /tmp/pipe_rx
         let payload: Vec<u8> = encode_assignment(
             OctopipesCapError::NoError,
-            Some(String::from("/tmp/pipe_tx")),
-            Some(String::from("/tmp/pipe_rx")),
+            Some(&String::from("/tmp/pipe_tx")),
+            Some(&String::from("/tmp/pipe_rx")),
         );
         assert_eq!(
             payload.len(),
@@ -597,7 +597,7 @@ mod tests {
     #[test]
     fn test_get_cap_message_type() {
         //Test subscribe
-        let payload: Vec<u8> = encode_subscribption(vec![String::from("SUBSCRIBE")]);
+        let payload: Vec<u8> = encode_subscribption(&vec![String::from("SUBSCRIBE")]);
         assert_eq!(
             get_cap_message_type(&payload).unwrap(),
             OctopipesCapMessage::Subscription,
@@ -607,8 +607,8 @@ mod tests {
         //Test assignment
         let payload: Vec<u8> = encode_assignment(
             OctopipesCapError::NoError,
-            Some(String::from("/tmp/pipe_tx")),
-            Some(String::from("/tmp/pipe_rx")),
+            Some(&String::from("/tmp/pipe_tx")),
+            Some(&String::from("/tmp/pipe_rx")),
         );
         assert_eq!(
             get_cap_message_type(&payload).unwrap(),
