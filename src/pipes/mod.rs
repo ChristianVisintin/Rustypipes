@@ -68,7 +68,7 @@ pub(super) fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<
     let t_start = Instant::now();
     let mut time_elapsed: Duration = Duration::from_millis(0);
     let mut data_out: Vec<u8> = Vec::new();
-    while time_elapsed.as_millis() < timeout_millis {
+    while time_elapsed.as_millis() < timeout_millis || timeout_millis == 0 {
         let mut buffer: [u8; 2048] = [0; 2048];
         match pipe.read(&mut buffer) {
             Ok(bytes) => {
@@ -110,7 +110,7 @@ pub(super) fn pipe_write(path: &String, timeout_millis: u128, data_out: Vec<u8>)
     let t_start = Instant::now();
     let mut time_elapsed: Duration = Duration::from_millis(0);
     let mut pipe_wrapper: Option<std::fs::File> = None;
-    while time_elapsed.as_millis() < timeout_millis {
+    while time_elapsed.as_millis() < timeout_millis || timeout_millis == 0 {
         let res = unix_named_pipe::open_write(path);
         match res {
             Ok(file) => { 
@@ -135,7 +135,7 @@ pub(super) fn pipe_write(path: &String, timeout_millis: u128, data_out: Vec<u8>)
     }
     let mut bytes_written: usize = 0;
     let mut pipe: std::fs::File = pipe_wrapper.unwrap();
-    while time_elapsed.as_millis() < timeout_millis {
+    while time_elapsed.as_millis() < timeout_millis || timeout_millis == 0 {
         match pipe.write(data_out.as_slice()) {
             Ok(bytes) => {
                 //Sum elapsed time

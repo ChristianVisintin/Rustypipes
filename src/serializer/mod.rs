@@ -39,13 +39,13 @@ const MINIMUM_SIZE_VERSION_1: usize = 17;
 /// ### encode_message
 ///
 /// `encode_message` encodes an OctopipesMessage struct to an Octopipes packet
-pub(super) fn encode_message(message: &mut OctopipesMessage) -> Result<Vec<u8>, OctopipesError> {
+pub(super) fn encode_message(message: &OctopipesMessage) -> Result<Vec<u8>, OctopipesError> {
     //Match version
     match message.version {
         OctopipesProtocolVersion::Version1 => {
             //Start with calculating the data size
             let mut data_size = MINIMUM_SIZE_VERSION_1; //Minimum size
-                                                        //Sum message origin
+            //Sum message origin
             match &message.origin {
                 Some(origin) => {
                     data_size = data_size + origin.len();
@@ -119,7 +119,7 @@ pub(super) fn encode_message(message: &mut OctopipesMessage) -> Result<Vec<u8>, 
             //if isset option IGNORE CHECKSUM do not set checksum
             if !message.isset_option(OctopipesOptions::ICK) {
                 //set checksum
-                message.checksum = calculate_checksum(message);
+                let checksum = calculate_checksum(message);
                 data_out[checksum_index] = message.checksum;
             }
             Ok(data_out)
