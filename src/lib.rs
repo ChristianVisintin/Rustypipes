@@ -191,7 +191,7 @@ struct OctopipesServerWorker {
     //Thread stuff
     worker_loop: Option<thread::JoinHandle<()>>,
     worker_active: Arc<Mutex<bool>>, //When set to false, the worker must terminate
-    receiver: mpsc::Receiver<(Result<OctopipesMessage, OctopipesError>)>,
+    receiver: mpsc::Receiver<(Result<OctopipesMessage, OctopipesServerError>)>,
 }
 
 /// ### Subscription

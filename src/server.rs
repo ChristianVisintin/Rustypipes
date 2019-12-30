@@ -406,6 +406,115 @@ impl OctopipesServer {
         }
     }
 
+    /// ### process_first
+    ///
+    /// `process_first` Find the first Worker which has an available message to process and dispatch it
+    /// When OK is returned, the number of processed workers is returned
+    /// If no worker has a message to process, the function will just return Ok
+    /// If an error was returned during the process, the function will return Error((client_id, Error))
+    pub fn process_first(&self) -> Result<usize, (String, OctopipesServerError)> {
+        //Iterate over workers
+        let mut workers_processed: usize = 0;
+        for worker in self.workers.iter() {
+            //Get next message
+            match worker.get_next_message() {
+                Ok(message_opt) => {
+                    match message_opt {
+                        None => {
+                            //If it hasn't any message, just keep iterating
+                            continue;
+                        }
+                        Some(message) => {
+                            //If a message is returned, dispatch the message to endpoints
+                            if let Err((_, error)) = self.dispatch_message(&message) {
+                                return Err((worker.client_id.clone(), error));
+                            }
+                            //Eventually increment workers processed
+                            workers_processed += 1;
+                            break; //Break cause we process only the first
+                        }
+                    }
+                }
+                Err(error) => {
+                    //If an error is returned, return error pairing it with the worker id
+                    return Err((worker.client_id.clone(), error));
+                }
+            }
+        }
+        Ok(workers_processed)
+    }
+
+    /// ### process_once
+    ///
+    /// `process_once` For each worker process the first message in its inbox. If the worker has no message it will be just ignored.
+    /// When OK is returned, the number of processed workers is returned
+    /// If no worker has a message to process, the function will just return Ok
+    /// If an error was returned during the process, the function will return Error((client_id, Error))
+    pub fn process_once(&self) -> Result<usize, (String, OctopipesServerError)> {
+        //Iterate over workers
+        let mut workers_processed: usize = 0;
+        for worker in self.workers.iter() {
+            //Get next message
+            match worker.get_next_message() {
+                Ok(message_opt) => {
+                    match message_opt {
+                        None => {
+                            //If it hasn't any message, just keep iterating
+                            continue;
+                        }
+                        Some(message) => {
+                            //If a message is returned, dispatch the message to endpoints
+                            if let Err((_, error)) = self.dispatch_message(&message) {
+                                return Err((worker.client_id.clone(), error));
+                            }
+                            //Eventually increment workers processed
+                            workers_processed += 1;
+                        }
+                    }
+                }
+                Err(error) => {
+                    //If an error is returned, return error pairing it with the worker id
+                    return Err((worker.client_id.clone(), error));
+                }
+            }
+        }
+        Ok(workers_processed)
+    }
+
+    /// ### process_once
+    ///
+    /// `process_once` For each worker process the first message in its inbox. If the worker has no message it will be just ignored.
+    /// Once all the workers have been process the function will restart until all the workers has no more message in their inbox.
+    /// When OK is returned, the number of processed workers is returned
+    /// If no worker has a message to process, the function will just return Ok
+    /// If an error was returned during the process, the function will return Error((client_id, Error))
+    pub fn process_all(&self) -> Result<usize, (String, OctopipesServerError)> {
+        let mut total_workers_processed = 0;
+        loop {
+            match self.process_once() {
+                Ok(workers_processed) => {
+                    if workers_processed == 0 {
+                        break;
+                    }
+                    total_workers_processed += workers_processed;
+                }
+                Err((client, error)) => return Err((client, error)),
+            }
+        }
+        Ok(total_workers_processed)
+    }
+
+    //@! Getters
+    pub fn is_subscribed(&self, client: String) -> Option<std::time::Instant> {
+        //Check if a client is subscribed and if it is, return the subscription time
+        for worker in &self.workers {
+            if worker.client_id == client {
+                return Some(worker.subscription.subscription_time);
+            }
+        }
+        None
+    }
+
     //@! Privates
 
     /// ### match_subscription
@@ -532,6 +641,27 @@ impl OctopipesServerWorker {
                 match pipes::pipe_write(&self.pipe_write, timeout, data_out) {
                     Ok(..) => Ok(()),
                     Err(..) => Err(OctopipesServerError::WriteFailed),
+                }
+            }
+        }
+    }
+
+    /// ### get_next_message
+    ///
+    /// `get_next_message` Get the next available message
+    pub fn get_next_message(&self) -> Result<Option<OctopipesMessage>, OctopipesServerError> {
+        //Call try recv
+        match self.receiver.try_recv() {
+            Ok(received) => {
+                match received {
+                    Ok(message) => Ok(Some(message)), //If a message has been read, return message
+                    Err(error) => Err(error),         //Otherwise return error
+                }
+            }
+            Err(recv_error) => {
+                match recv_error {
+                    mpsc::TryRecvError::Empty => Ok(None), //If recv queue is empty return none
+                    _ => Err(OctopipesServerError::WorkerNotRunning), //Otherwise return Worker not running
                 }
             }
         }
