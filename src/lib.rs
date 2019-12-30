@@ -171,6 +171,7 @@ pub struct OctopipesServer {
     state: Arc<Mutex<OctopipesServerState>>,
     //Pipe
     cap_pipe: String,
+    client_folder: String,
     //Thread
     cap_listener: Option<thread::JoinHandle<()>>,
     cap_receiver: Option<mpsc::Receiver<(Result<OctopipesMessage, OctopipesError>)>>, //Receives OctopipesMessage from clients; responses are sent through methods
@@ -222,6 +223,7 @@ pub enum OctopipesServerError {
     WorkerNotFound,
     WorkerAlreadyRunning,
     WorkerNotRunning,
+    NoRecipient,
     Unknown,
 }
 

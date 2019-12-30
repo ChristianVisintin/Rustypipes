@@ -123,6 +123,7 @@ impl OctopipesServerError {
             OctopipesServerError::BadChecksum => "Packet has bad checksum",
             OctopipesServerError::BadPacket => "It was not possible to decode packet, since it contains bad data",
             OctopipesServerError::CapTimeout => "CAP timeout",
+            OctopipesServerError::NoRecipient => "The provided message has no recipient",
             OctopipesServerError::OpenFailed => "Could not open the requested pipe",
             OctopipesServerError::ReadFailed => "Could not read from pipe",
             OctopipesServerError::ThreadAlreadyRunning => "Client loop Thread is already running",
