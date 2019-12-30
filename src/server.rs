@@ -378,7 +378,11 @@ impl OctopipesServer {
                         //Parse subscription message
                         match cap::decode_subscription(&message.data) {
                             Err(err) => Err(err.to_server_error()),
-                            Ok(groups) => self.manage_subscription(&origin, &groups),
+                            Ok(mut groups) => {
+                                //@! Very important, add client id to groups
+                                groups.push(origin.clone());
+                                self.manage_subscription(&origin, &groups)
+                            }
                         }
                     }
                     OctopipesCapMessage::Unsubscription => {
