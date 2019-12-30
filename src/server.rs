@@ -568,11 +568,27 @@ impl OctopipesServer {
     }
 
     //@! Getters
+    /// ### is_subscribed
+    ///
+    /// `is_subscribed` returns whether a client with a certain ID is subscribed or not
     pub fn is_subscribed(&self, client: String) -> Option<std::time::Instant> {
         //Check if a client is subscribed and if it is, return the subscription time
         for worker in &self.workers {
             if worker.client_id == client {
                 return Some(worker.subscription.subscription_time);
+            }
+        }
+        None
+    }
+
+    /// ### get_subscriptions
+    ///
+    /// `get_subscriptions` Get all the subscriptions for a certain client
+    pub fn get_subscriptions(&self, client: String) -> Option<Vec<String>> {
+        for worker in &self.workers {
+            if worker.client_id == client {
+                //Return groups
+                return Some(worker.subscription.groups.clone());
             }
         }
         None
@@ -667,9 +683,7 @@ impl OctopipesServerWorker {
                             }
                             Err(err) => {
                                 //Send error
-                                if let Err(..) =
-                                    worker_sender.send(Err(err.to_server_error()))
-                                {
+                                if let Err(..) = worker_sender.send(Err(err.to_server_error())) {
                                     terminate_thread = true; //Terminate thread if it wasn't possible to send message to the main thread
                                 }
                             }
