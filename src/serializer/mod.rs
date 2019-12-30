@@ -120,7 +120,7 @@ pub(super) fn encode_message(message: &OctopipesMessage) -> Result<Vec<u8>, Octo
             if !message.isset_option(OctopipesOptions::ICK) {
                 //set checksum
                 let checksum = calculate_checksum(message);
-                data_out[checksum_index] = message.checksum;
+                data_out[checksum_index] = checksum;
             }
             Ok(data_out)
         }
@@ -227,7 +227,7 @@ pub(super) fn decode_message(data: Vec<u8>) -> Result<OctopipesMessage, Octopipe
                     }
                     //Instance OctopipesMessage
                     let message: OctopipesMessage = OctopipesMessage::new(
-                        &version, &origin, &remote, ttl, options, checksum, payload,
+                        &version, &origin, &remote, ttl, options, payload,
                     );
                     //Verify checksum if required
                     if !message.isset_option(OctopipesOptions::ICK) {
@@ -307,18 +307,17 @@ mod tests {
         let predicted_size: usize =
             MINIMUM_SIZE_VERSION_1 + origin.len() + remote.len() + payload.len();
         //Prepare message
-        let mut message: OctopipesMessage = OctopipesMessage::new(
+        let message: OctopipesMessage = OctopipesMessage::new(
             &OctopipesProtocolVersion::Version1,
             &Some(origin.clone()),
             &Some(remote.clone()),
             60,
             OctopipesOptions::RCK,
-            0,
             payload,
         );
         //Encode message
-        let data: Vec<u8> = encode_message(&mut message).expect("Could not encode message");
-        let checksum = message.checksum;
+        let data: Vec<u8> = encode_message(&message).expect("Could not encode message");
+        let checksum = calculate_checksum(&message);
         //Dump data
         print!("Data dump: ");
         for byte in &data {
@@ -567,18 +566,17 @@ mod tests {
         //Calculate estimated size
         let predicted_size: usize = MINIMUM_SIZE_VERSION_1 + origin.len() + payload.len();
         //Prepare message
-        let mut message: OctopipesMessage = OctopipesMessage::new(
+        let message: OctopipesMessage = OctopipesMessage::new(
             &OctopipesProtocolVersion::Version1,
             &Some(origin.clone()),
             &None,
             60,
             OctopipesOptions::ICK,
-            0,
             payload,
         );
         //Encode message
-        let data: Vec<u8> = encode_message(&mut message).expect("Could not encode message");
-        let checksum = message.checksum; //Should be 0
+        let data: Vec<u8> = encode_message(&message).expect("Could not encode message");
+        let checksum = 0; //Should be 0
         assert_eq!(
             checksum, 0,
             "Checksum should be 0, but is {:02x}, even if ICK is set",
@@ -817,19 +815,18 @@ mod tests {
         //Calculate estimated size
         let predicted_size: usize = MINIMUM_SIZE_VERSION_1;
         //Prepare message
-        let mut message: OctopipesMessage = OctopipesMessage::new(
+        let message: OctopipesMessage = OctopipesMessage::new(
             &OctopipesProtocolVersion::Version1,
             &None,
             &None,
             0,
             OctopipesOptions::empty(),
-            0,
             vec![],
         );
         //Encode message
-        let data: Vec<u8> = encode_message(&mut message).expect("Could not encode message");
-        let checksum = message.checksum; //Should be 0
-                                         //Dump data
+        let data: Vec<u8> = encode_message(&message).expect("Could not encode message");
+        let checksum = calculate_checksum(&message);
+        //Dump data
         print!("Data dump: ");
         for byte in &data {
             print!("{:02x} ", *byte);

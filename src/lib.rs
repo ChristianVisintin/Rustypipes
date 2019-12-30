@@ -132,7 +132,6 @@ pub struct OctopipesMessage {
     remote: Option<String>,
     ttl: u8,
     options: OctopipesOptions,
-    checksum: u8,
     data: Vec<u8>,
 }
 

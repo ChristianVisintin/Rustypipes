@@ -124,7 +124,6 @@ impl OctopipesClient {
                                                     &message_origin,
                                                     message.ttl,
                                                     OctopipesOptions::ACK,
-                                                    0,
                                                     vec![],
                                                 );
                                             //Encode message
@@ -294,16 +293,15 @@ impl OctopipesClient {
             &self.version,
             &Some(self.id.clone()),
             &None,
-            0,
+            60,
             OctopipesOptions::empty(),
-            0,
             payload,
         );
         //Encode message
         match serializer::encode_message(&mut message) {
             Ok(data_out) => {
                 //Write message to cap
-                match pipes::pipe_write(&self.cap_pipe, 5000, data_out) {
+                match pipes::pipe_write(&self.cap_pipe, 60000, data_out) {
                     Ok(..) => Ok(()),
                     Err(..) => Err(OctopipesError::WriteFailed),
                 }
@@ -349,7 +347,6 @@ impl OctopipesClient {
             &Some(remote.clone()),
             ttl,
             options,
-            0,
             data,
         );
         //Encode message
