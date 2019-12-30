@@ -576,23 +576,50 @@ impl OctopipesServerWorker {
         }
         //Prepare thread stuff
         let pipe_read: String = cli_pipe_tx.clone();
-        let pipe_write: String = cli_pipe_rx.clone();
         let worker_active: Arc<Mutex<bool>> = Arc::new(Mutex::new(true)); //True
         let thread_active: Arc<Mutex<bool>> = Arc::clone(&worker_active); //Clone active for thread
                                                                           //Create channel
         let (worker_sender, worker_receiver) = mpsc::channel();
         //Start thread
         let join_handle = thread::spawn(move || {
-            //TODO: implement thread
             let mut terminate_thread: bool = false;
             while !terminate_thread {
+                //Check if thread has to be stopped
                 {
-                    //Check if thread has to be stopped
                     let active = thread_active.lock().unwrap();
                     if *active == false {
                         terminate_thread = true;
                     }
                 }
+                //Try to read from pipe
+                match pipes::pipe_read(&pipe_read, 500) {
+                    Ok(data) => {
+                        //Try to decode data
+                        match serializer::decode_message(data) {
+                            Ok(message) => {
+                                //Send message
+                                if let Err(..) = worker_sender.send(Ok(message)) {
+                                    terminate_thread = true; //Terminate threda if it wasn't possible to send message to the main thread
+                                }
+                            }
+                            Err(..) => {
+                                //Send error
+                                if let Err(..) =
+                                    worker_sender.send(Err(OctopipesServerError::BadPacket))
+                                {
+                                    terminate_thread = true; //Terminate thread if it wasn't possible to send message to the main thread
+                                }
+                            }
+                        }
+                    }
+                    Err(..) => {
+                        //Send error
+                        if let Err(..) = worker_sender.send(Err(OctopipesServerError::ReadFailed)) {
+                            terminate_thread = true; //Terminate thread if it wasn't possible to send message to the main thread
+                        }
+                    }
+                }
+                thread::sleep(Duration::from_millis(100));
             }
             //NOTE: Move sender here
         });
