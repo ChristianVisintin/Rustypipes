@@ -73,7 +73,6 @@ pub(super) fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<
         match pipe.read(&mut buffer) {
             Ok(bytes) => {
                 //Sum elapsed time
-                time_elapsed = t_start.elapsed();
                 //If 0 bytes were read:
                 // - If there are already bytes in the buffer, return
                 // - Otherwise continue until time_elapsed < timeout
@@ -81,6 +80,7 @@ pub(super) fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<
                     if data_out.len() > 0 {
                         break;
                     } else {
+                        time_elapsed = t_start.elapsed(); //Sum time only if no data was received (in order to prevent cuts)
                         continue;
                     }
                 }
