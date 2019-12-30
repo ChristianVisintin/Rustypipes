@@ -80,6 +80,8 @@ impl OctopipesClient {
                 if self.rx_pipe.is_none() || self.tx_pipe.is_none() {
                     return Err(OctopipesError::Uninitialized);
                 }
+                //Set state to running
+                *client_state = OctopipesState::Running;
                 let this_state_rc = Arc::clone(&self.state);
                 let rx_pipe: String = self.rx_pipe.as_ref().unwrap().clone();
                 let tx_pipe: String = self.tx_pipe.as_ref().unwrap().clone();
@@ -158,8 +160,6 @@ impl OctopipesClient {
                     thread::sleep(std::time::Duration::from_millis(100));
                     //Exit
                 }));
-                //Set state to running
-                *client_state = OctopipesState::Running;
                 Ok(())
             }
             OctopipesState::Running => Err(OctopipesError::ThreadAlreadyRunning),
