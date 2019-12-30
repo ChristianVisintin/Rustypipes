@@ -1,3 +1,7 @@
+//! ## Integration Tests
+//!
+//! The integration test consists in simulating and entire server with a client
+
 // 
 //   RustyPipes
 //   Developed by Christian Visintin
@@ -21,10 +25,32 @@
 // SOFTWARE.
 // 
 
+extern crate rustypipes;
+
 #[cfg(test)]
 mod tests {
+    use std::thread::{JoinHandle, spawn};
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+        fn server_sim() {
+        //Simulates an entire server with a client
+        let cap_pipe: String = String::from("/tmp/cap.fifo");
+        let client_folder: String = String::from("/tmp/");
+        //Instance Server
+        let mut server: rustypipes::OctopipesServer = rustypipes::OctopipesServer::new(rustypipes::OctopipesProtocolVersion::Version1, cap_pipe, client_folder);
+        //Start server
+        if let Err(error) = server.start_cap_listener() {
+            panic!("Could not start CAP listener: {}", error);
+        }
+        //Start client
+        let client_join_hnd: JoinHandle<()> = spawn(move || {
+
+        });
+        //Listen for client
+
+        client_join_hnd.join();
+        //Stop server
+        if let Err(error) = server.stop_cap_listener() {
+            panic!("Could not stop CAP listener: {}", error);
+        }
     }
 }

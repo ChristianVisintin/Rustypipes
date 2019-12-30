@@ -119,7 +119,7 @@ impl OctopipesServer {
                     //Parse message
                     match serializer::decode_message(data_in) {
                         Err(err) => {
-                            if let Err(_) = cap_sender.send(Err(err)) {
+                            if let Err(_) = cap_sender.send(Err(OctopipesServerError::BadPacket)) {
                                 break; //Terminate thread
                             }
                         }
@@ -291,6 +291,69 @@ impl OctopipesServer {
         Ok(())
     }
     //@! Management
+
+    /// ### process_cap_once
+    ///
+    /// `process_cap_once` Reads up to one message from the CAP receiver and process it.
+    /// When Ok, returns the amount of messages processed (0/1), otherwise an Error
+    pub fn process_cap_once(&mut self) -> Result<usize, OctopipesServerError> {
+        {
+            //Check if server is intiialized
+            let current_server_state = self.state.lock().unwrap();
+            if *current_server_state != OctopipesServerState::Running {
+                return Err(OctopipesServerError::Uninitialized);
+            }
+        }
+        if self.cap_receiver.is_none() {
+            return Err(OctopipesServerError::Uninitialized);
+        }
+        let receiver: &mpsc::Receiver<Result<OctopipesMessage, OctopipesServerError>> =
+            self.cap_receiver.as_ref().unwrap();
+        //Call try recv
+        match receiver.try_recv() {
+            Ok(received) => {
+                match received {
+                    Ok(message) => {
+                        //Process message
+                        match self.manage_cap_message(&message) {
+                            Ok(..) => Ok(1),
+                            Err(err) => Err(err),
+                        }
+                    }
+                    Err(error) => Err(error), //Otherwise return error
+                }
+            }
+            Err(recv_error) => {
+                match recv_error {
+                    mpsc::TryRecvError::Empty => Ok(0), //If recv queue is empty return none
+                    _ => Err(OctopipesServerError::WorkerNotRunning), //Otherwise return Worker not running
+                }
+            }
+        }
+    }
+
+    /// ### process_cap_all
+    ///
+    /// `process_cap_all` Reads all the available messages on the CAP until no one is available.
+    /// When Ok, returns the amount of messages processed, otherwise Error
+    pub fn process_cap_all(&mut self) -> Result<usize, OctopipesServerError> {
+        let mut amount_of_process: usize = 0;
+        loop {
+            match self.process_cap_once() {
+                Ok(processed_messages) => {
+                    if processed_messages > 0 {
+                        amount_of_process += processed_messages;
+                        continue;
+                    } else {
+                        break; //No more messages
+                    }
+                }
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(amount_of_process)
+    }
+
     /// ### manage_cap_message
     ///
     /// `manage_cap_message` Takes a Message from CAP and based on its type perform an action to the server.
