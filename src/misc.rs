@@ -114,6 +114,18 @@ impl OctopipesError {
             _ => "Unknown error"
         }
     }
+    pub fn to_server_error(&self) -> OctopipesServerError {
+        match self {
+            OctopipesError::BadChecksum => OctopipesServerError::BadChecksum,
+            OctopipesError::BadPacket => OctopipesServerError::BadPacket,
+            OctopipesError::CapTimeout => OctopipesServerError::CapTimeout,
+            OctopipesError::OpenFailed => OctopipesServerError::OpenFailed,
+            OctopipesError::ReadFailed => OctopipesServerError::ReadFailed,
+            OctopipesError::WriteFailed => OctopipesServerError::WriteFailed,
+            OctopipesError::UnsupportedVersion => OctopipesServerError::UnsupportedVersion,
+            _ => OctopipesServerError::Unknown
+        }
+    }
 }
 
 impl OctopipesServerError {

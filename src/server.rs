@@ -119,7 +119,7 @@ impl OctopipesServer {
                     //Parse message
                     match serializer::decode_message(data_in) {
                         Err(err) => {
-                            if let Err(_) = cap_sender.send(Err(OctopipesServerError::BadPacket)) {
+                            if let Err(_) = cap_sender.send(Err(err.to_server_error())) {
                                 break; //Terminate thread
                             }
                         }
@@ -194,9 +194,9 @@ impl OctopipesServer {
         );
         //Encode message
         match serializer::encode_message(&message) {
-            Err(..) => {
+            Err(err) => {
                 self.unlock_cap();
-                Err(OctopipesServerError::BadPacket)
+                Err(err.to_server_error())
             }
             Ok(data) => {
                 //Write data out
@@ -371,20 +371,20 @@ impl OctopipesServer {
         }
         //Get message type
         match cap::get_cap_message_type(&message.data) {
-            Err(..) => Err(OctopipesServerError::BadPacket),
+            Err(err) => Err(err.to_server_error()),
             Ok(cap_message) => {
                 match cap_message {
                     OctopipesCapMessage::Subscription => {
                         //Parse subscription message
                         match cap::decode_subscription(&message.data) {
-                            Err(..) => Err(OctopipesServerError::BadPacket),
+                            Err(err) => Err(err.to_server_error()),
                             Ok(groups) => self.manage_subscription(&origin, &groups),
                         }
                     }
                     OctopipesCapMessage::Unsubscription => {
                         //Parse unsubscription
                         match cap::decode_unsubscription(&message.data) {
-                            Err(..) => Err(OctopipesServerError::BadPacket),
+                            Err(err) => Err(err.to_server_error()),
                             Ok(..) => self.manage_unsubscription(&origin),
                         }
                     }
@@ -665,10 +665,10 @@ impl OctopipesServerWorker {
                                     terminate_thread = true; //Terminate threda if it wasn't possible to send message to the main thread
                                 }
                             }
-                            Err(..) => {
+                            Err(err) => {
                                 //Send error
                                 if let Err(..) =
-                                    worker_sender.send(Err(OctopipesServerError::BadPacket))
+                                    worker_sender.send(Err(err.to_server_error()))
                                 {
                                     terminate_thread = true; //Terminate thread if it wasn't possible to send message to the main thread
                                 }
@@ -724,7 +724,7 @@ impl OctopipesServerWorker {
     pub fn send(&self, message: &OctopipesMessage) -> Result<(), OctopipesServerError> {
         //Encode message
         match serializer::encode_message(message) {
-            Err(..) => Err(OctopipesServerError::BadPacket),
+            Err(err) => Err(err.to_server_error()),
             Ok(data_out) => {
                 //Write data
                 let timeout: u128 = message.ttl as u128 * 1000;
