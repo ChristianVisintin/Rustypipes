@@ -170,13 +170,13 @@ impl OctopipesClient {
     /// ###  loop_stop
     ///
     /// `loop_stop` stops the client loop thread
-    /// ```
     pub fn loop_stop(&mut self) -> Result<(), OctopipesError> {
         let mut client_state = self.state.lock().unwrap();
         match *client_state {
             OctopipesState::Running => {
                 //Stop thread
                 *client_state = OctopipesState::Stopped;
+                drop(client_state); //Otherwise the other thread will never read the state
                 //Take joinable out of Option and then Join thread (NOTE: Using take prevents errors!)
                 self.client_loop.take().map(thread::JoinHandle::join);
                 Ok(())

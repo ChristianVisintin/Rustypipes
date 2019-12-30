@@ -189,9 +189,8 @@ struct OctopipesServerWorker {
     pipe_read: String,  //TX Pipe of the client
     pipe_write: String, //RX Pipe of the client
     //Thread stuff
-    worker_loop: thread::JoinHandle<()>,
+    worker_loop: Option<thread::JoinHandle<()>>,
     worker_active: Arc<Mutex<bool>>, //When set to false, the worker must terminate
-    sender: mpsc::Sender<(Result<OctopipesMessage, OctopipesError>)>,
     receiver: mpsc::Receiver<(Result<OctopipesMessage, OctopipesError>)>,
 }
 
@@ -199,8 +198,31 @@ struct OctopipesServerWorker {
 ///
 /// `Subscription` is a struct which stores the data for a single subscription from a client
 struct Subscription {
-    subscription_time: std::time::SystemTime,
+    subscription_time: std::time::Instant,
     groups: Vec<String>,
+}
+
+/// ### OctopipesServerError
+///
+/// `OctopipesServerError` describes the kind of error returned by an operation on the OctopipesServer
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum OctopipesServerError {
+    Uninitialized,
+    BadPacket,
+    BadChecksum,
+    UnsupportedVersion,
+    OpenFailed,
+    WriteFailed,
+    ReadFailed,
+    CapTimeout,
+    ThreadError,
+    ThreadAlreadyRunning,
+    WorkerExists,
+    WorkerNotFound,
+    WorkerAlreadyRunning,
+    WorkerNotRunning,
+    Unknown,
 }
 
 /// ### OctopipesServerState

@@ -30,6 +30,7 @@ use super::OctopipesCapMessage;
 use super::OctopipesError;
 use super::OctopipesProtocolVersion;
 use super::OctopipesOptions;
+use super::OctopipesServerError;
 
 use std::fmt;
 
@@ -115,6 +116,27 @@ impl OctopipesError {
     }
 }
 
+impl OctopipesServerError {
+    pub fn to_string(&self) -> &str {
+        match self {
+            OctopipesServerError::Uninitialized => "OctopipesServer is not initialized yet",
+            OctopipesServerError::BadChecksum => "Packet has bad checksum",
+            OctopipesServerError::BadPacket => "It was not possible to decode packet, since it contains bad data",
+            OctopipesServerError::CapTimeout => "CAP timeout",
+            OctopipesServerError::OpenFailed => "Could not open the requested pipe",
+            OctopipesServerError::ReadFailed => "Could not read from pipe",
+            OctopipesServerError::ThreadAlreadyRunning => "Client loop Thread is already running",
+            OctopipesServerError::ThreadError => "Thread error",
+            OctopipesServerError::WorkerAlreadyRunning => "The requested worker is already running",
+            OctopipesServerError::WorkerNotFound => "The requested Worker couldn't be found",
+            OctopipesServerError::WorkerExists => "The requested Worker already exists",
+            OctopipesServerError::WorkerNotRunning => "This worker is not running",
+            OctopipesServerError::UnsupportedVersion => "Unsupported protocol version",
+            _ => "Unknown error"
+        }
+    }
+}
+
 impl fmt::Debug for OctopipesError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.to_string())
@@ -122,6 +144,18 @@ impl fmt::Debug for OctopipesError {
 }
 
 impl fmt::Display for OctopipesError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
+
+impl fmt::Debug for OctopipesServerError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
+
+impl fmt::Display for OctopipesServerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.to_string())
     }

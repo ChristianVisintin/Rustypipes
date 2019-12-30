@@ -28,7 +28,7 @@
 
 use super::OctopipesCapError;
 use super::OctopipesCapMessage;
-use super::OctopipesError;
+use super::OctopipesServerError;
 use super::OctopipesMessage;
 use super::OctopipesOptions;
 use super::OctopipesProtocolVersion;
@@ -63,16 +63,16 @@ impl OctopipesServer {
     /// ###  start_cap_listener
     ///
     /// `start_cap_listener` Start CAP listener thread
-    pub fn start_cap_listener(&mut self) -> Result<(), OctopipesError> {
+    pub fn start_cap_listener(&mut self) -> Result<(), OctopipesServerError> {
         //Check if thread is already running
         if self.cap_listener.is_some() {
-            return Err(OctopipesError::ThreadAlreadyRunning);
+            return Err(OctopipesServerError::ThreadAlreadyRunning);
         }
         //Create CAP copy
         let cap_pipe: String = self.cap_pipe.clone();
         //Create CAP
         if let Err(_) = pipes::pipe_create(&cap_pipe) {
-            return Err(OctopipesError::OpenFailed);
+            return Err(OctopipesServerError::OpenFailed);
         }
         //Set server to running
         {
@@ -130,8 +130,194 @@ impl OctopipesServer {
         Ok(())
     }
 
-    //TODO: drop
-    //TODO: stop cap listener (which must deletes CAP too)
-    //TODO: create worker
-    //TODO: stop worker
+    /// ###  stop_cap_listener
+    ///
+    /// `stop_cap_listener` stops the server cap listener thread
+    pub fn stop_cap_listener(&mut self) -> Result<(), OctopipesServerError> {
+        //Set server to running
+        let mut server_state = self.state.lock().unwrap();
+        match *server_state {
+            OctopipesServerState::Running => {
+                *server_state = OctopipesServerState::Stopped;
+                drop(server_state); //Otherwise other thread will never read the stopped state
+                //Take joinable out of Option and then Join thread (NOTE: Using take prevents errors!)
+                self.cap_listener.take().map(thread::JoinHandle::join);
+                //Delete CAP
+                let _ = pipes::pipe_delete(&self.cap_pipe);
+                Ok(())
+            },
+            _ => {
+                Ok(())
+            }
+        }
+    }
+
+    /// ###  start_worker
+    ///
+    /// `start_worker` add and starts a new worker for the Octopipes Server. The server must be in Running state
+    pub fn add_worker(&mut self, client: String, subscriptions: Vec<String>, cli_tx_pipe: String, cli_rx_pipe: String) -> Result<(), OctopipesServerError> {
+        //State must be already started
+        {
+            let server_state = self.state.lock().unwrap();
+            if *server_state != OctopipesServerState::Running {
+                return Err(OctopipesServerError::Uninitialized)
+            }
+        }
+        //Check if a worker with that name already exists
+        if self.worker_exists(&client) {
+            return Err(OctopipesServerError::WorkerExists)
+        }
+        //Instance new worker
+        let new_worker: OctopipesServerWorker = OctopipesServerWorker::new(client, subscriptions, cli_tx_pipe, cli_rx_pipe);
+        //Push new worker to workers
+        self.workers.push(new_worker);
+        Ok(())
+    }
+
+    //TODO: start worker
+
+    /// ###  stop_worker
+    ///
+    /// `stop_worker` stops a running worker for the Octopipes Server. The server must be in Running state
+    pub fn stop_worker(&mut self, client: String) -> Result<(), OctopipesServerError> {
+        //Look for worker in workers
+        let mut item: usize = 0;
+        for worker in self.workers.iter_mut() {
+            if worker.client_id == client {
+                let result = worker.stop_worker();
+                //Remove worker from workers
+                self.workers.remove(item);
+                return result
+            }
+            item += 1;
+        }
+        Err(OctopipesServerError::WorkerNotFound)
+    }
+
+    /// ###  drop_worker
+    ///
+    /// `drop_worker` drop a worker, if still running the worker will be stopped first
+    pub fn drop_worker(&mut self, client: String) -> Result<(), OctopipesServerError> {
+        //Look for worker in workers
+        let mut item: usize = 0;
+        for worker in self.workers.iter_mut() {
+            if worker.client_id == client {
+                drop(worker);
+                //Remove worker from workers
+                self.workers.remove(item);
+                return Ok(())
+            }
+            item += 1;
+        }
+        Err(OctopipesServerError::WorkerNotFound)
+    }
+
+    //TODO: match subscribption
+
+    //@! Privates
+
+    /// ###  worker_exists
+    ///
+    /// `worker_exists` Checks whether a Worker with that name already exists
+    fn worker_exists(&self, worker_name: &String) -> bool {
+        for worker in &self.workers {
+            if worker.client_id == *worker_name {
+                return true
+            }
+        }
+        false
+    }
+}
+
+impl Drop for OctopipesServer {
+    fn drop(&mut self) {
+        //Stop workers
+        for worker in self.workers.iter_mut() {
+            worker.stop_worker();
+        }
+        //Stop thread
+        match self.stop_cap_listener() {
+            Ok(_) => drop(self),
+            Err(error) => panic!(error), //Don't worry, it won't panic
+        }
+    }
+}
+
+impl OctopipesServerWorker {
+    /// ###  new
+    ///
+    /// `new` instances a new OctopipesServerWorker
+    fn new(client_id: String, subscriptions: Vec<String>, cli_pipe_tx: String, cli_pipe_rx: String) -> OctopipesServerWorker {
+        //Prepare subscriptions
+        let subscriptions_obj = Subscription::new(subscriptions);
+        //Prepare thread stuff
+        //TODO: split new and start
+        let pipe_read: String = cli_pipe_tx.clone();
+        let pipe_write: String = cli_pipe_rx.clone();
+        let worker_active: Arc<Mutex<bool>> = Arc::new(Mutex::new(true)); //True
+        let thread_active: Arc<Mutex<bool>> = Arc::clone(&worker_active); //Clone active for thread
+        //Create channel
+        let (worker_sender, worker_receiver) = mpsc::channel();
+        //Start thread
+        let join_handle = thread::spawn(move || {
+            //TODO: implement thread
+            let mut terminate_thread: bool = false;
+            while ! terminate_thread {
+                { //Check if thread has to be stopped
+                    let active = thread_active.lock().unwrap();
+                    if *active == false {
+                        terminate_thread = true;
+                    }
+                }
+            }
+            //NOTE: Move sender here
+        });
+        //Instance and return a new OctopipesServerWorker
+        OctopipesServerWorker {
+            client_id: client_id,
+            subscription: subscriptions_obj,
+            pipe_read: cli_pipe_tx, //Invert pipes for Server
+            pipe_write: cli_pipe_rx, //Invert pipes for Server
+            worker_loop: Some(join_handle),
+            worker_active: worker_active,
+            receiver: worker_receiver
+        }
+    }
+
+    /// ###  stop_worker
+    ///
+    /// `stop_worker` stops worker
+    fn stop_worker(&mut self) -> Result<(), OctopipesServerError> {
+        {
+            let mut active = self.worker_active.lock().unwrap();
+            *active = false;
+        }
+        //Stop thread
+        if self.worker_loop.is_some() {
+            self.worker_loop.take().map(thread::JoinHandle::join);
+            Ok(())
+        } else {
+            Err(OctopipesServerError::WorkerNotRunning)
+        }
+    }
+}
+
+impl Drop for OctopipesServerWorker {
+    fn drop(&mut self) {
+        //Stop thread
+        let _ = self.stop_worker();
+        drop(self);
+    }
+}
+
+impl Subscription {
+    /// ###  new
+    ///
+    /// `new` instances a new Subscription
+    fn new(subscriptions: Vec<String>) -> Subscription {
+        Subscription {
+            groups: subscriptions,
+            subscription_time: std::time::Instant::now()
+        }
+    }
 }
