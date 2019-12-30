@@ -153,12 +153,60 @@ impl OctopipesServer {
         }
     }
 
+    /// ###  lock_cap
+    ///
+    /// `lock_cap` Set Server state to BLOCK in order to stop reading from pipe
+    fn lock_cap(&mut self) {
+        let mut server_state = self.state.lock().unwrap();
+        *server_state = OctopipesServerState::Block;
+    }
+
+    /// ###  unlock_cap
+    ///
+    /// `unlock_cap` Set server state back to RUNNING in order to allow read from pipe
+    fn unlock_cap(&mut self) {
+        let mut server_state = self.state.lock().unwrap();
+        *server_state = OctopipesServerState::Running;
+    }
+
+    /// ###  write_cap
+    ///
+    /// `write_cap` write a message to the CAP
+    fn write_cap(&mut self, client: &String, data_out: Vec<u8>) -> Result<(), OctopipesServerError> {
+        //Block CAP
+        self.lock_cap();
+        //Prepare message
+        let message: OctopipesMessage = OctopipesMessage::new(&self.version, &None, &Some(client.clone()), 60, OctopipesOptions::empty(), 0, data_out);
+        //Encode message
+        match serializer::encode_message(&message) {
+            Err(..) => {
+                self.unlock_cap();
+                Err(OctopipesServerError::BadPacket)
+            },
+            Ok(data) => {
+                //Write data out
+                match pipes::pipe_write(&self.cap_pipe, 60000, data) {
+                    Ok(..) => {
+                        //Unlock CAP
+                        self.unlock_cap();
+                        Ok(())
+                    },
+                    Err(..) => {
+                        //Unlock CAP
+                        self.unlock_cap();
+                        Err(OctopipesServerError::WriteFailed)
+                    }
+                }
+            }
+        }
+    }
+
     //@! Workers
 
     /// ###  start_worker
     ///
     /// `start_worker` add and starts a new worker for the Octopipes Server. The server must be in Running state
-    pub fn start_worker(
+    fn start_worker(
         &mut self,
         client: String,
         subscriptions: Vec<String>,
@@ -190,11 +238,11 @@ impl OctopipesServer {
     /// ###  stop_worker
     ///
     /// `stop_worker` stops a running worker for the Octopipes Server. The server must be in Running state
-    pub fn stop_worker(&mut self, client: String) -> Result<(), OctopipesServerError> {
+    fn stop_worker(&mut self, client: &String) -> Result<(), OctopipesServerError> {
         //Look for worker in workers
         let mut item: usize = 0;
         for worker in self.workers.iter_mut() {
-            if worker.client_id == client {
+            if worker.client_id == *client {
                 let result = worker.stop_worker();
                 drop(worker);
                 //Remove worker from workers
@@ -228,7 +276,100 @@ impl OctopipesServer {
         Ok(())
     }
     //@! Management
-    //TODO: manage_subscription / manage_unsubscription
+    
+    /// ### manage_cap_message
+    ///
+    /// `manage_cap_message` Takes a Message from CAP and based on its type perform an action to the server.
+    /// If necessary it also responds to the client through the CAP.
+    /// (e.g. in case of subscription it will send an assignment back)
+    pub fn manage_cap_message(&mut self, message: &OctopipesMessage) -> Result<OctopipesCapMessage, OctopipesServerError> {
+        //Get message origin, if None, return error
+        let origin: String;
+        match &message.origin {
+            None => return Err(OctopipesServerError::NoRecipient),
+            Some(client) => origin = client.clone()
+        }
+        //Get message type
+        match cap::get_cap_message_type(&message.data) {
+            Err(..) => Err(OctopipesServerError::BadPacket),
+            Ok(cap_message) => {
+                match cap_message {
+                    OctopipesCapMessage::Subscription => {
+                        //Parse subscription message
+                        match cap::decode_subscription(&message.data) {
+                            Err(..) => Err(OctopipesServerError::BadPacket),
+                            Ok(groups) => self.manage_subscription(&origin, &groups)
+                        }
+                    },
+                    OctopipesCapMessage::Unsubscription => {
+                        //Parse unsubscription
+                        match cap::decode_unsubscription(&message.data) {
+                            Err(..) => Err(OctopipesServerError::BadPacket),
+                            Ok(..) => self.manage_unsubscription(&origin)
+                        }
+                    },
+                    _ => Err(OctopipesServerError::BadPacket)
+                }
+            }
+        }
+    }
+
+    /// ### manage_subscription
+    ///
+    /// `manage_subscription` Handle a subscription request. If a worker with this ID is available start a new one and send the assignment back to the client
+    fn manage_subscription(&mut self, client_id: &String, groups: &Vec<String>) -> Result<OctopipesCapMessage, OctopipesServerError> {
+        //Check if client is already subsribed
+        for worker in &self.workers {
+            if *client_id == worker.client_id {
+                //Encode assignment with cap error
+                let data_out: Vec<u8> = cap::encode_assignment(OctopipesCapError::NameAlreadyTaken, None, None);
+                let _ = self.write_cap(client_id, data_out);
+                return Err(OctopipesServerError::WorkerExists)
+            }
+        }
+        //Okay, client doesn't exist, assign Pipes
+        let tx_pipe: String = self.client_folder.clone() + "/" + client_id + "_tx.fifo";
+        let rx_pipe: String = self.client_folder.clone() + "/" + client_id + "_rx.fifo";
+        //Start worker
+        match self.start_worker(client_id.clone(), groups.clone(), tx_pipe.clone(), rx_pipe.clone()) {
+            Err(error) => {
+                let data_out: Vec<u8> = cap::encode_assignment(OctopipesCapError::FileSystemError, None, None);
+                let _ = self.write_cap(client_id, data_out);
+                Err(error)
+            },
+            Ok(..) => {
+                //Encode assignment
+                let data_out: Vec<u8> = cap::encode_assignment(OctopipesCapError::NoError, Some(&tx_pipe), Some(&rx_pipe));
+                match self.write_cap(client_id, data_out) {
+                    Err(err) => Err(err),
+                    Ok(..) => Ok(OctopipesCapMessage::Subscription)
+                }
+            }
+        }
+    }
+
+    /// ### manage_unsubscription
+    ///
+    /// `manage_unsubscription` Handle an unsubscription request stopping the worker associated to this client
+    fn manage_unsubscription(&mut self, client_id: &String) -> Result<OctopipesCapMessage, OctopipesServerError> {
+        //Check if client is already subsribed
+        let mut client_exists: bool = false;
+        for worker in &self.workers {
+            if *client_id == worker.client_id {
+                client_exists = true;
+                break;
+            }
+        }
+        //If client doesn't exist return error, don't send anything back to client though
+        if !client_exists {
+            return Err(OctopipesServerError::WorkerNotFound)
+        }
+        //Stop worker
+        match self.stop_worker(client_id) {
+            Ok(..) => Ok(OctopipesCapMessage::Unsubscription),
+            Err(err) => Err(err)
+        }
+    }
 
     //@! Privates
 
