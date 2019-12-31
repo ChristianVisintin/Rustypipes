@@ -65,6 +65,29 @@ impl OctopipesServer {
         }
     }
 
+    /// ###  stop_server
+    ///
+    /// `stop_server` stops the octopipes server (workers and cap listener)
+    pub fn stop_server(&mut self) -> Result<(), OctopipesServerError> {
+        {
+            let current_state = self.state.lock().unwrap();
+            if *current_state != OctopipesServerState::Running {
+                return Ok(())
+            }
+        }
+        //Stop workers
+        for worker in self.workers.iter_mut() {
+            if let Err(error) = worker.stop_worker() {
+                return Err(error)
+            }
+        }
+        //Stop thread
+        if let Err(error) = self.stop_cap_listener() {
+            return Err(error)
+        }
+        Ok(())
+    }
+
     //@! CAP
 
     /// ###  start_cap_listener
@@ -596,6 +619,17 @@ impl OctopipesServer {
             }
         }
         None
+    }
+
+    /// ### get_clients
+    ///
+    /// `get_clients` Get all the clients id subscribed to the server
+    pub fn get_clients(&self) -> Vec<String> {
+        let mut clients: Vec<String> = Vec::with_capacity(self.workers.len());
+        for worker in &self.workers {
+            clients.push(worker.client_id.clone());
+        }
+        clients
     }
 
     //@! Privates

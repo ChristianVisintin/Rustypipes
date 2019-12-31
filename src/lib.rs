@@ -173,7 +173,7 @@ pub struct OctopipesServer {
     client_folder: String,
     //Thread
     cap_listener: Option<thread::JoinHandle<()>>,
-    cap_receiver: Option<mpsc::Receiver<(Result<OctopipesMessage, OctopipesServerError>)>>, //Receives OctopipesMessage from clients; responses are sent through methods
+    cap_receiver: Option<mpsc::Receiver<Result<OctopipesMessage, OctopipesServerError>>>, //Receives OctopipesMessage from clients; responses are sent through methods
     //workers
     workers: Vec<OctopipesServerWorker>
 }
@@ -191,7 +191,7 @@ struct OctopipesServerWorker {
     //Thread stuff
     worker_loop: Option<thread::JoinHandle<()>>,
     worker_active: Arc<Mutex<bool>>, //When set to false, the worker must terminate
-    receiver: mpsc::Receiver<(Result<OctopipesMessage, OctopipesServerError>)>,
+    receiver: mpsc::Receiver<Result<OctopipesMessage, OctopipesServerError>>,
 }
 
 /// ### Subscription
