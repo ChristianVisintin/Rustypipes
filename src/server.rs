@@ -134,7 +134,7 @@ impl OctopipesServer {
                     }
                 }
                 //Listen on CAP
-                if let Ok(data_in) = pipes::pipe_read(&cap_pipe, 500) {
+                if let Ok(data_in) = pipes::pipe_read(&cap_pipe, 100) {
                     if data_in.len() == 0 {
                         thread::sleep(Duration::from_millis(100));
                         continue;
@@ -186,6 +186,7 @@ impl OctopipesServer {
     fn lock_cap(&mut self) {
         let mut server_state = self.state.lock().unwrap();
         *server_state = OctopipesServerState::Block;
+        thread::sleep(Duration::from_millis(100)); //Give main thread the time to block
     }
 
     /// ###  unlock_cap
@@ -260,6 +261,7 @@ impl OctopipesServer {
         }
         //Check if a worker with that name already exists
         if self.worker_exists(&client) {
+            //TODO: implement zombie workers
             return Err(OctopipesServerError::WorkerExists);
         }
         //Instance new worker

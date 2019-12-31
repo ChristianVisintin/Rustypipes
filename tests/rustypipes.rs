@@ -54,6 +54,7 @@ mod tests {
         let client_terminate_arc2: Arc<Mutex<bool>> = Arc::clone(&client_terminate_arc);
         //Start client
         let client_join_hnd: JoinHandle<()> = spawn(move || {
+            println!("Client_r thread started");
             //This client subscribes to BROADCAST and then wait for an incoming message from client_w
             let t_start: Instant = Instant::now();
             let cap_pipe_w: String = cap_pipe_r.clone();
@@ -67,9 +68,9 @@ mod tests {
                 Ok(cap_error) => {
                     match cap_error {
                         rustypipes::OctopipesCapError::NoError => {
-                            println!("Client subscribed (no CAP error)");
+                            println!("Client_r subscribed (no CAP error)");
                         },
-                        _ => panic!("Couldn't subscribe, CAP error: {}\n", cap_error)
+                        _ => panic!("Client_r couldn't subscribe, CAP error: {}\n", cap_error)
                     }
                 },
                 Err(error) => panic!("Error while client_r was trying to subscribe to server: {}\n", error)
@@ -84,6 +85,7 @@ mod tests {
             }
             //@! Start WRITE client
             let client_w_join_hnd: JoinHandle<()> = spawn(move || {
+                println!("Client_w thread started");
                 //This client subscribes and then sends a message to test_client_r
                 let t_start: Instant = Instant::now();
                 let mut client_w: rustypipes::OctopipesClient = rustypipes::OctopipesClient::new(
@@ -91,11 +93,16 @@ mod tests {
                     cap_pipe_w,
                     rustypipes::OctopipesProtocolVersion::Version1,
                 );
-                if let Err(error) = client_w.subscribe(&vec![]) {
-                    panic!(
-                        "Error while client_w was trying to subscribe to server: {}\n",
-                        error
-                    );
+                match client_w.subscribe(&vec![]) {
+                    Ok(cap_error) => {
+                        match cap_error {
+                            rustypipes::OctopipesCapError::NoError => {
+                                println!("Client_w subscribed (no CAP error)");
+                            },
+                            _ => panic!("Client_w couldn't subscribe, CAP error: {}\n", cap_error)
+                        }
+                    },
+                    Err(error) => panic!("Error while client_w was trying to subscribe to server: {}\n", error)
                 }
                 println!(
                     "It took {}ms for client_w to subscribe",
@@ -133,6 +140,7 @@ mod tests {
             });
             //Wait for client message
             let mut message_received: bool = false;
+            println!("Client_r is now waiting for incoming messages...");
             while !message_received {
                 match client_r.get_all_message() {
                     Err(error) => {
@@ -152,7 +160,9 @@ mod tests {
                                 message.origin.as_ref().unwrap()
                             );
                         }
-                        message_received = true;
+                        if messages.len() > 0 {
+                            message_received = true;
+                        }
                     }
                 }
             }
@@ -177,18 +187,11 @@ mod tests {
             *terminated = true;
             //@! End of test_client_r thread
         });
-        sleep(Duration::from_millis(200));
+        sleep(Duration::from_millis(100));
         //Set a timer (10s)
         let t_start_loop: Instant = Instant::now();
         //Wait for both clients subscription
-        while server
-            .is_subscribed(String::from("test_client_r"))
-            .is_none()
-            && server
-                .is_subscribed(String::from("test_client_w"))
-                .is_none()
-            && t_start_loop.elapsed().as_millis() < 10000
-        {
+        while (server.is_subscribed(String::from("test_client_r")).is_none() || server.is_subscribed(String::from("test_client_w")).is_none()) && t_start_loop.elapsed().as_millis() < 10000 {
             //Process cap
             if let Err(error) = server.process_cap_all() {
                 panic!("Error while processing CAP: {}\n", error);
@@ -198,10 +201,10 @@ mod tests {
         if t_start_loop.elapsed().as_millis() >= 10000 {
             panic!("Client couldn't subscribe (TIMEOUT)\n");
         }
-        println!("OK, 'test_client' is subscribed");
+        println!("OK, 'test_client_r and test_client_w' is subscribed");
         //Verify if client is subscribed
         let clients: Vec<String> = server.get_clients();
-        assert_eq!(clients.len(), 2, "Clients are not subscribed");
+        assert_eq!(clients.len(), 2, "Clients are not subscribed (clients subscribed: {})", clients.len());
         //Verify test_client_r subscriptions
         match server.get_subscriptions(String::from("test_client_r")) {
             Some(groups) => {
@@ -229,7 +232,7 @@ mod tests {
                     groups[0],
                     String::from("test_client_w"),
                     "Groups[0] should be 'test_client_w' but is {}",
-                    groups[1]
+                    groups[0]
                 );
             }
             None => panic!("'test_client_w' is subscribed to nothing\n"),
