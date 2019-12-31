@@ -101,49 +101,53 @@ impl OctopipesClient {
                         //Try to read (Read for 500 ms and sleep for 100ms)
                         match pipes::pipe_read(&rx_pipe, 500) {
                             Ok(data) => {
-                                if data.len() == 0 {
-                                    thread::sleep(std::time::Duration::from_millis(100));
-                                    continue; //Just go on
-                                }
-                                //Otherwise parse message and send to callback
-                                match serializer::decode_message(data) {
-                                    Ok(message) => {
-                                        //If message has ACK, send ACK back
-                                        if message.options.intersects(OctopipesOptions::RCK) {
-                                            //if RCK is set, send ACK back
-                                            let message_origin: Option<String> =
-                                                match message.origin.as_ref() {
-                                                    Some(origin) => Some(origin.clone()),
-                                                    None => None,
-                                                };
-                                            //Prepare message
-                                            let mut message: OctopipesMessage =
-                                                OctopipesMessage::new(
-                                                    &version,
-                                                    &Some(client_id.clone()),
-                                                    &message_origin,
-                                                    message.ttl,
-                                                    OctopipesOptions::ACK,
-                                                    vec![],
-                                                );
-                                            //Encode message
-                                            match serializer::encode_message(&mut message) {
-                                                Ok(data_out) => {
-                                                    //Write message to CAP
-                                                    let _ =
-                                                        pipes::pipe_write(&tx_pipe, 5000, data_out);
+                                match data {
+                                    None => {
+                                        thread::sleep(std::time::Duration::from_millis(100));
+                                        continue; //Just go on
+                                    },
+                                    Some(data) => {
+                                        //Otherwise parse message and send to callback
+                                        match serializer::decode_message(data) {
+                                            Ok(message) => {
+                                                //If message has ACK, send ACK back
+                                                if message.options.intersects(OctopipesOptions::RCK) {
+                                                    //if RCK is set, send ACK back
+                                                    let message_origin: Option<String> =
+                                                        match message.origin.as_ref() {
+                                                            Some(origin) => Some(origin.clone()),
+                                                            None => None,
+                                                        };
+                                                    //Prepare message
+                                                    let mut message: OctopipesMessage =
+                                                        OctopipesMessage::new(
+                                                            &version,
+                                                            &Some(client_id.clone()),
+                                                            &message_origin,
+                                                            message.ttl,
+                                                            OctopipesOptions::ACK,
+                                                            vec![],
+                                                        );
+                                                    //Encode message
+                                                    match serializer::encode_message(&mut message) {
+                                                        Ok(data_out) => {
+                                                            //Write message to CAP
+                                                            let _ =
+                                                                pipes::pipe_write(&tx_pipe, 5000, data_out);
+                                                        }
+                                                        Err(..) => { /*Ignore error*/ }
+                                                    }
                                                 }
-                                                Err(..) => { /*Ignore error*/ }
+                                                //Send message
+                                                if let Err(_) = client_sender.send(Ok(message)) {
+                                                    break; //Terminate thread
+                                                }
                                             }
-                                        }
-                                        //Send message
-                                        if let Err(_) = client_sender.send(Ok(message)) {
-                                            break; //Terminate thread
-                                        }
-                                    }
-                                    Err(err) => {
-                                        if let Err(_) = client_sender.send(Err(err)) {
-                                            break; //Terminate thread
+                                            Err(err) => {
+                                                if let Err(_) = client_sender.send(Err(err)) {
+                                                    break; //Terminate thread
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -205,40 +209,42 @@ impl OctopipesClient {
                 match pipes::pipe_read(&self.cap_pipe, 5000) {
                     Err(..) => Err(OctopipesError::ReadFailed),
                     Ok(data_in) => {
-                        if data_in.len() == 0 {
-                            return Err(OctopipesError::NoDataAvailable)
-                        }
-                        //Parse message
-                        match serializer::decode_message(data_in) {
-                            Err(err) => Err(err),
-                            Ok(response) => {
-                                //Check if message type is ASSIGNMENT
-                                match cap::get_cap_message_type(&response.data) {
-                                    Ok(message_type) => {
-                                        match message_type {
-                                            OctopipesCapMessage::Assignment => {
-                                                //Ok, is an ASSIGNMENT
-                                                //Parse assignment params
-                                                match cap::decode_assignment(&response.data) {
-                                                    Ok((cap_error, pipe_tx, pipe_rx)) => {
-                                                        //Assign params
-                                                        if cap_error != OctopipesCapError::NoError {
-                                                            return Ok(cap_error);
+                        match data_in {
+                            None => return Err(OctopipesError::NoDataAvailable),
+                            Some(data_in) => {
+                                //Parse message
+                                match serializer::decode_message(data_in) {
+                                    Err(err) => Err(err),
+                                    Ok(response) => {
+                                        //Check if message type is ASSIGNMENT
+                                        match cap::get_cap_message_type(&response.data) {
+                                            Ok(message_type) => {
+                                                match message_type {
+                                                    OctopipesCapMessage::Assignment => {
+                                                        //Ok, is an ASSIGNMENT
+                                                        //Parse assignment params
+                                                        match cap::decode_assignment(&response.data) {
+                                                            Ok((cap_error, pipe_tx, pipe_rx)) => {
+                                                                //Assign params
+                                                                if cap_error != OctopipesCapError::NoError {
+                                                                    return Ok(cap_error);
+                                                                }
+                                                                self.tx_pipe = pipe_tx;
+                                                                self.rx_pipe = pipe_rx;
+                                                                let mut client_state =
+                                                                    self.state.lock().unwrap();
+                                                                *client_state = OctopipesState::Subscribed;
+                                                                Ok(OctopipesCapError::NoError)
+                                                            }
+                                                            Err(err) => Err(err),
                                                         }
-                                                        self.tx_pipe = pipe_tx;
-                                                        self.rx_pipe = pipe_rx;
-                                                        let mut client_state =
-                                                            self.state.lock().unwrap();
-                                                        *client_state = OctopipesState::Subscribed;
-                                                        Ok(OctopipesCapError::NoError)
                                                     }
-                                                    Err(err) => Err(err),
+                                                    _ => Err(OctopipesError::BadPacket),
                                                 }
                                             }
-                                            _ => Err(OctopipesError::BadPacket),
+                                            Err(err) => Err(err),
                                         }
                                     }
-                                    Err(err) => Err(err),
                                 }
                             }
                         }
@@ -305,7 +311,7 @@ impl OctopipesClient {
         match serializer::encode_message(&mut message) {
             Ok(data_out) => {
                 //Write message to cap
-                match pipes::pipe_write(&self.cap_pipe, 60000, data_out) {
+                match pipes::pipe_write(&self.cap_pipe, 5000, data_out) {
                     Ok(..) => Ok(()),
                     Err(..) => Err(OctopipesError::WriteFailed),
                 }

@@ -58,7 +58,7 @@ pub(super) fn pipe_delete(path: &String) -> std::io::Result<()> {
 /// ### pipe_read
 ///
 /// `pipe_read` read from pipe; Returns or if after millis nothing has been read or if there's no more data available
-pub(super) fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<Vec<u8>> {
+pub(super) fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<Option<Vec<u8>>> {
     //Try open pipe
     let res = unix_named_pipe::open_read(path);
     if res.is_err() {
@@ -99,7 +99,11 @@ pub(super) fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<
             }
         }
     }
-    Ok(data_out)
+    if data_out.len() > 0 {
+        Ok(Some(data_out))
+    } else {
+        Ok(None)
+    }
 }
 
 /// ### pipe_write
@@ -208,7 +212,11 @@ mod tests {
         });
         //Read
         match pipe_read(&pipe_rx, 5000) {
-            Ok(data) => {
+            Ok(data_opt) => {
+                if data_opt.is_none() {
+                    panic!("Data shouldn't be None");
+                }
+                let data: Vec<u8> = data_opt.unwrap();
                 //Print data
                 print!("Pipe Read - Successfully read data: ");
                 for byte in &data {
@@ -247,14 +255,12 @@ mod tests {
         //Read (Should return after 3 seconds)
         let t_start = Instant::now();
         match pipe_read(&String::from("/tmp/pipe_read_noendpoint"), 3000) {
-            Ok(data) => {
-                //Print data
-                assert_eq!(
-                    data.len(),
-                    0,
-                    "Pipe read WITHOUT ENDPOINT: data len should be 0, but is {}",
-                    data.len()
-                );
+            Ok(data_opt) => {
+                if data_opt.is_none() {
+                    println!("Ok, data is None as expected");
+                } else {
+                    panic!("Data shouldn't be some!");
+                }
                 let elapsed_time: Duration = t_start.elapsed();
                 assert!(
                     elapsed_time.as_millis() >= 3000,

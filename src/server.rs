@@ -151,21 +151,25 @@ impl OctopipesServer {
                 }
                 //Listen on CAP
                 if let Ok(data_in) = pipes::pipe_read(&cap_pipe, 100) {
-                    if data_in.len() == 0 {
-                        thread::sleep(Duration::from_millis(100));
-                        continue;
-                    }
-                    //Parse message
-                    match serializer::decode_message(data_in) {
-                        Err(err) => {
-                            if let Err(_) = cap_sender.send(Err(err.to_server_error())) {
-                                break; //Terminate thread
-                            }
-                        }
-                        Ok(message) => {
-                            //Send CAP message
-                            if let Err(_) = cap_sender.send(Ok(message)) {
-                                break; //Terminate thread
+                    match data_in {
+                        None => {
+                            thread::sleep(Duration::from_millis(100));
+                            continue;
+                        },
+                        Some(data_in) => {
+                            //Parse message
+                            match serializer::decode_message(data_in) {
+                                Err(err) => {
+                                    if let Err(_) = cap_sender.send(Err(err.to_server_error())) {
+                                        break; //Terminate thread
+                                    }
+                                }
+                                Ok(message) => {
+                                    //Send CAP message
+                                    if let Err(_) = cap_sender.send(Ok(message)) {
+                                        break; //Terminate thread
+                                    }
+                                }
                             }
                         }
                     }
@@ -729,7 +733,7 @@ impl OctopipesServerWorker {
                 //Try to read from pipe
                 match pipes::pipe_read(&pipe_read, 500) {
                     Ok(data) => {
-                        if data.len() > 0 { //If data.len() is > 0, process data
+                        if let Some(data) = data {
                             //Try to decode data
                             match serializer::decode_message(data) {
                                 Ok(message) => {
