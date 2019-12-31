@@ -245,7 +245,7 @@ impl OctopipesServer {
     /// ###  start_worker
     ///
     /// `start_worker` add and starts a new worker for the Octopipes Server. The server must be in Running state
-    fn start_worker(
+    pub fn start_worker(
         &mut self,
         client: String,
         subscriptions: Vec<String>,
@@ -261,7 +261,7 @@ impl OctopipesServer {
         }
         //Check if a worker with that name already exists
         if self.worker_exists(&client) {
-            //TODO: implement zombie workers
+            //Refuse subscription from an already subscribed client
             return Err(OctopipesServerError::WorkerExists);
         }
         //Instance new worker
@@ -278,7 +278,7 @@ impl OctopipesServer {
     /// ###  stop_worker
     ///
     /// `stop_worker` stops a running worker for the Octopipes Server. The server must be in Running state
-    fn stop_worker(&mut self, client: &String) -> Result<(), OctopipesServerError> {
+    pub fn stop_worker(&mut self, client: &String) -> Result<(), OctopipesServerError> {
         //Look for worker in workers
         let mut item: usize = 0;
         for worker in self.workers.iter_mut() {
