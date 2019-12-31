@@ -98,6 +98,22 @@ impl OctopipesServer {
         if self.cap_listener.is_some() {
             return Err(OctopipesServerError::ThreadAlreadyRunning);
         }
+        //Create directory for clients
+        if let Err(_) = std::fs::create_dir_all(self.client_folder.clone()) {
+            return Err(OctopipesServerError::BadClientDir)
+        }
+        //Delete all pipes in client folder first
+        if let Ok(files) = std::fs::read_dir(self.client_folder.clone()) {
+            //Delete all files
+            for file_res in files {
+                if let Ok(file) = file_res {
+                    let file_path = file.path();
+                    if file_path.is_file() {
+                        let _ = std::fs::remove_file(file_path);
+                    }
+                } 
+            }
+        }
         //Create CAP copy
         let cap_pipe: String = self.cap_pipe.clone();
         //Create CAP

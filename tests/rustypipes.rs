@@ -37,7 +37,7 @@ mod tests {
         //Simulates an entire server with a client
         let cap_pipe: String = String::from("/tmp/cap.fifo");
         let cap_pipe_r: String = cap_pipe.clone();
-        let client_folder: String = String::from("/tmp/");
+        let client_folder: String = String::from("/tmp/clients/");
         //Instance Server
         let mut server: rustypipes::OctopipesServer = rustypipes::OctopipesServer::new(
             rustypipes::OctopipesProtocolVersion::Version1,
@@ -63,7 +63,7 @@ mod tests {
                 cap_pipe_r,
                 rustypipes::OctopipesProtocolVersion::Version1,
             );
-            let groups: Vec<String> = vec![String::from("BROADCAST")];
+            let groups: Vec<String> = vec![String::from("TestClient"), String::from("BROADCAST")];
             match client_r.subscribe(&groups) {
                 Ok(cap_error) => {
                     match cap_error {
@@ -111,7 +111,7 @@ mod tests {
                 //Send a message
                 let t_subscribed: Instant = Instant::now();
                 if let Err(error) = client_w.send(
-                    &String::from("test_client_r"),
+                    &String::from("TestClient"),
                     vec!['H' as u8, 'E' as u8, 'L' as u8, 'L' as u8, 'O' as u8],
                 ) {
                     panic!(
@@ -208,18 +208,24 @@ mod tests {
         //Verify test_client_r subscriptions
         match server.get_subscriptions(String::from("test_client_r")) {
             Some(groups) => {
-                //Subscriptions should be 'BROADCAST' and 'test_client_r' (cause implicit)
+                //Subscriptions should be 'TestClient' 'BROADCAST' and 'test_client_r' (cause implicit)
                 assert_eq!(
                     groups[0],
-                    String::from("BROADCAST"),
-                    "Groups[0] should be 'BROADCAST' but is {}",
+                    String::from("TestClient"),
+                    "Groups[0] should be 'TestClient' but is {}",
                     groups[0]
                 );
                 assert_eq!(
                     groups[1],
+                    String::from("BROADCAST"),
+                    "Groups[1] should be 'BROADCAST' but is {}",
+                    groups[1]
+                );
+                assert_eq!(
+                    groups[2],
                     String::from("test_client_r"),
                     "Groups[1] should be 'test_client_r' but is {}",
-                    groups[1]
+                    groups[2]
                 );
             }
             None => panic!("'test_client_r' is subscribed to nothing\n"),

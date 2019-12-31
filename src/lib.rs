@@ -223,6 +223,7 @@ pub enum OctopipesServerError {
     WorkerAlreadyRunning,
     WorkerNotRunning,
     NoRecipient,
+    BadClientDir,
     Unknown,
 }
 

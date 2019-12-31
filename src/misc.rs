@@ -133,6 +133,7 @@ impl OctopipesServerError {
         match self {
             OctopipesServerError::Uninitialized => "OctopipesServer is not initialized yet",
             OctopipesServerError::BadChecksum => "Packet has bad checksum",
+            OctopipesServerError::BadClientDir => "Could not create client directory",
             OctopipesServerError::BadPacket => "It was not possible to decode packet, since it contains bad data",
             OctopipesServerError::CapTimeout => "CAP timeout",
             OctopipesServerError::NoRecipient => "The provided message has no recipient",
