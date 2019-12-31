@@ -1,6 +1,73 @@
 //! # RustyPipes
 //!
 //! `rusty-pipes` is a library which provides functions to work with the Octopipes Protocol
+//! 
+//! ## Examples
+//! ### Client
+//! 
+//! ```
+//! extern crate rustypipes;
+//! 
+//! //Instance new client
+//! let mut client: rustypipes::OctopipesClient = rustypipes::OctopipesClient::new(String::from("myclient"), String::from("/tmp/cap.fifo"), rustypipes::OctopipesProtocolVersion::Version1);
+//! //Subscribe to the preferred groups
+//! if let Err(error) = client.subscribe(&vec![String::from("MYSUBSCRIPTIONS")]) {
+//!     println!("Error while trying to subscribe: {}", error);
+//! }
+//! //Start loop (optional, a client could also only send messages)
+//! if let Err(error) = client.start_loop() {
+//!     println!("Error while trying to start loop: {}", error);
+//! }
+//! //In a loop get the next message
+//! match client.get_next_message() {
+//!     Err(error) => {
+//!         println!("Error while fetching new messages: {}", error);
+//!     },
+//!     Ok(inbox) => {
+//!         if let Some(message) = inbox {
+//!             //Do what you want with your message
+//!         }
+//!     }
+//! };
+//! //Send the message you want
+//! if let Err(error) = client.send(&String::from("MY_RECIPIENT"), vec!['H' as u8, 'I' as u8]) {
+//!     println!("Error while sending message: {}", error);
+//! }
+//! //Unsubscribe once you're done
+//! if let Err(error) = client.unsubscribe() {
+//!     println!("Error while trying to unsubscribe: {}", error);
+//! }
+//! ```
+//! 
+//! ### Server
+//! 
+//! ```
+//! extern crate rustypipes;
+//! 
+//! //Instance a server
+//! let mut server: rustypipes::OctopipesServer = rustypipes::OctopipesServer::new(rustypipes::OctopipesProtocolVersion::Version1, String::from("/tmp/cap.fifo"), String::from("/tmp/clients/"));
+//! //Start CAP listener
+//! if let Err(error) = server.start_cap_listener() {
+//!     panic!("Could not start CAP listener: {}", error);
+//! }
+//! //In your main loop fetch workers and CAP, everything is handled by these functions, nothing else has to be done by the user
+//! let mut terminate_server: bool = false;
+//! while !terminate_server {
+//!     //Listen for incoming CAP messages (use cap_all or cap_once)
+//!     if let Err(error) = server.process_cap_all() {
+//!         println!("Error while processing CAP: {}", error);
+//!     }
+//!     //Process workers (You can use process_once, process_all, process_first)
+//!     if let Err((worker, error)) = server.process_once() {
+//!         println!("Error while trying to process client {}: {}", worker, error);
+//!     }
+//!     sleep(Duration::from_millis(100)); //Sleep for 100ms
+//! }
+//! //Once you're done terminate the server
+//! if let Err(error) = server.stop_server() {
+//!     panic!("Could not stop Server: {}\n", error);
+//! }
+//! ```
 
 //
 //   RustyPipes
