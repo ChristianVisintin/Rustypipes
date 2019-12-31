@@ -176,6 +176,7 @@ impl OctopipesClient {
                 //Stop thread
                 *client_state = OctopipesState::Stopped;
                 drop(client_state); //Otherwise the other thread will never read the state
+                
                 //Take joinable out of Option and then Join thread (NOTE: Using take prevents errors!)
                 self.client_loop.take().map(thread::JoinHandle::join);
                 Ok(())
@@ -368,6 +369,56 @@ impl OctopipesClient {
             }
             Err(err) => Err(err),
         }
+    }
+
+    //@! Message readers
+    /// ###  get_next_message
+    ///
+    /// `get_next_message` Gets the next available message on the receiver
+    /// If a message is available Ok(message) is returned
+    /// If no message is available Ok(None) is returned
+    /// If there was an error while reading inbox, Err(OctopipesError) is returned
+    pub fn get_next_message(&self) -> Result<Option<OctopipesMessage>, OctopipesError> {
+        {
+            //Check if thread is running
+            let current_state = self.state.lock().unwrap();
+            if *current_state != OctopipesState::Running {
+                return Err(OctopipesError::Uninitialized);
+            }
+        }
+        //Try receive
+        match self.client_receiver.as_ref() {
+            None => Err(OctopipesError::Uninitialized),
+            Some(receiver) => match receiver.try_recv() {
+                Ok(payload) => match payload {
+                    Ok(message) => Ok(Some(message)),
+                    Err(error) => Err(error),
+                },
+                Err(error) => match error {
+                    mpsc::TryRecvError::Empty => Ok(None),
+                    _ => Err(OctopipesError::ThreadError),
+                },
+            },
+        }
+    }
+
+    /// ###  get_all_message
+    ///
+    /// `get_all_message` Gets all the available messages on the receiver
+    /// If there was no error while reading the inbox a vector with all the messages is returned (could have length 0)
+    /// If there was an error while reading inbox, Err(OctopipesError) is returned
+    pub fn get_all_message(&self) -> Result<Vec<OctopipesMessage>, OctopipesError> {
+        let mut inbox: Vec<OctopipesMessage> = Vec::new();
+        loop {
+            match self.get_next_message() {
+                Err(error) => return Err(error),
+                Ok(ret) => match ret {
+                    Some(message) => inbox.push(message),
+                    None => break,
+                },
+            }
+        }
+        Ok(inbox)
     }
 
     //Callbacks setters
