@@ -29,10 +29,10 @@ use super::OctopipesCapError;
 use super::OctopipesCapMessage;
 use super::OctopipesError;
 
-/// ### encode_subscribption
+/// ### encode_subscription
 ///
-/// `encode_subscribption` encodes a payload for a SUBSCRIBE CAP message
-pub(super) fn encode_subscribption(groups: &Vec<String>) -> Vec<u8> {
+/// `encode_subscription` encodes a payload for a SUBSCRIBE CAP message
+pub(super) fn encode_subscription(groups: &Vec<String>) -> Vec<u8> {
     let mut payload_size: usize = 2; //Minimum size
     for group in groups {
         payload_size += group.len() + 1; //Group len + byte for group len
@@ -97,10 +97,10 @@ pub(super) fn encode_assignment(
     }
 }
 
-/// ### encode_unsubscribption
+/// ### encode_unsubscription
 ///
-/// `encode_unsubscribption` encodes a payload for an UNSUBSCRIBE CAP message
-pub(super) fn encode_unsubscribption() -> Vec<u8> {
+/// `encode_unsubscription` encodes a payload for an UNSUBSCRIBE CAP message
+pub(super) fn encode_unsubscription() -> Vec<u8> {
     //Return payload
     vec![OctopipesCapMessage::Unsubscription as u8]
 }
@@ -241,11 +241,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_encode_subscribption_with_groups() {
+    fn test_encode_subscription_with_groups() {
         //Test subscribe payload encoding
         //We'll use two groups 'SUBSCRIBE' and 'SYSTEM'
         let payload: Vec<u8> =
-            encode_subscribption(&vec![String::from("SUBSCRIBE"), String::from("SYSTEM")]);
+            encode_subscription(&vec![String::from("SUBSCRIBE"), String::from("SYSTEM")]);
         assert_eq!(
             payload.len(),
             19,
@@ -358,9 +358,9 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_subscribption_without_groups() {
+    fn test_encode_subscription_without_groups() {
         //Test subscribe payload encoding
-        let payload: Vec<u8> = encode_subscribption(&vec![]);
+        let payload: Vec<u8> = encode_subscription(&vec![]);
         assert_eq!(
             payload.len(),
             2,
@@ -575,9 +575,9 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_unsubscribption() {
+    fn test_encode_unsubscription() {
         //Test unsubscribe payload encoding
-        let payload: Vec<u8> = encode_unsubscribption();
+        let payload: Vec<u8> = encode_unsubscription();
         assert_eq!(
             payload.len(),
             1,
@@ -597,7 +597,7 @@ mod tests {
     #[test]
     fn test_get_cap_message_type() {
         //Test subscribe
-        let payload: Vec<u8> = encode_subscribption(&vec![String::from("SUBSCRIBE")]);
+        let payload: Vec<u8> = encode_subscription(&vec![String::from("SUBSCRIBE")]);
         assert_eq!(
             get_cap_message_type(&payload).unwrap(),
             OctopipesCapMessage::Subscription,
@@ -617,7 +617,7 @@ mod tests {
             get_cap_message_type(&payload).unwrap()
         );
         //Test Unsubscribe
-        let payload: Vec<u8> = encode_unsubscribption();
+        let payload: Vec<u8> = encode_unsubscription();
         assert_eq!(
             get_cap_message_type(&payload).unwrap(),
             OctopipesCapMessage::Unsubscription,

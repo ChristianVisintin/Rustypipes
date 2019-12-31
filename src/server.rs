@@ -685,10 +685,10 @@ impl OctopipesServerWorker {
         //Prepare subscriptions
         let subscriptions_obj = Subscription::new(subscriptions);
         //Create pipes
-        if let Err(..) = pipes::pipe_delete(&cli_pipe_rx) {
+        if let Err(..) = pipes::pipe_create(&cli_pipe_rx) {
             return Err(OctopipesServerError::OpenFailed);
         }
-        if let Err(..) = pipes::pipe_delete(&cli_pipe_tx) {
+        if let Err(..) = pipes::pipe_create(&cli_pipe_tx) {
             return Err(OctopipesServerError::OpenFailed);
         }
         //Prepare thread stuff

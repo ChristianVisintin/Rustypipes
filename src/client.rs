@@ -185,7 +185,7 @@ impl OctopipesClient {
         }
     }
 
-    //Subscribption functions
+    //subscription functions
 
     /// ###  subscribe
     ///
@@ -196,7 +196,7 @@ impl OctopipesClient {
         subscription_list: &Vec<String>,
     ) -> Result<OctopipesCapError, OctopipesError> {
         //Prepare subscribe message
-        let payload: Vec<u8> = cap::encode_subscribption(subscription_list);
+        let payload: Vec<u8> = cap::encode_subscription(subscription_list);
         //Send message through the CAP
         match self.send_cap(payload) {
             Err(err) => Err(err),
@@ -259,7 +259,7 @@ impl OctopipesClient {
             }
         }
         //Prepare message
-        let payload: Vec<u8> = cap::encode_unsubscribption();
+        let payload: Vec<u8> = cap::encode_unsubscription();
         match self.send_cap(payload) {
             Err(err) => return Err(err),
             Ok(..) => {}
