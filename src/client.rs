@@ -205,6 +205,9 @@ impl OctopipesClient {
                 match pipes::pipe_read(&self.cap_pipe, 5000) {
                     Err(..) => Err(OctopipesError::ReadFailed),
                     Ok(data_in) => {
+                        if data_in.len() == 0 {
+                            return Err(OctopipesError::NoDataAvailable)
+                        }
                         //Parse message
                         match serializer::decode_message(data_in) {
                             Err(err) => Err(err),

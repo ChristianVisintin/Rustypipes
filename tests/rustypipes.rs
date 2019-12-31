@@ -255,6 +255,9 @@ mod tests {
             }
             sleep(Duration::from_millis(100)); //Sleep for 100ms
         }
+        //Force client interruption
+        let mut terminated = client_terminate_arc.lock().unwrap();
+        *terminated = true;
         println!(
             "It took {}ms to process all the two clients!",
             t_start_loop.elapsed().as_millis()

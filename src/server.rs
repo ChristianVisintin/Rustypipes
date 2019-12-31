@@ -713,18 +713,20 @@ impl OctopipesServerWorker {
                 //Try to read from pipe
                 match pipes::pipe_read(&pipe_read, 500) {
                     Ok(data) => {
-                        //Try to decode data
-                        match serializer::decode_message(data) {
-                            Ok(message) => {
-                                //Send message
-                                if let Err(..) = worker_sender.send(Ok(message)) {
-                                    terminate_thread = true; //Terminate threda if it wasn't possible to send message to the main thread
+                        if data.len() > 0 { //If data.len() is > 0, process data
+                            //Try to decode data
+                            match serializer::decode_message(data) {
+                                Ok(message) => {
+                                    //Send message
+                                    if let Err(..) = worker_sender.send(Ok(message)) {
+                                        terminate_thread = true; //Terminate threda if it wasn't possible to send message to the main thread
+                                    }
                                 }
-                            }
-                            Err(err) => {
-                                //Send error
-                                if let Err(..) = worker_sender.send(Err(err.to_server_error())) {
-                                    terminate_thread = true; //Terminate thread if it wasn't possible to send message to the main thread
+                                Err(err) => {
+                                    //Send error
+                                    if let Err(..) = worker_sender.send(Err(err.to_server_error())) {
+                                        terminate_thread = true; //Terminate thread if it wasn't possible to send message to the main thread
+                                    }
                                 }
                             }
                         }
