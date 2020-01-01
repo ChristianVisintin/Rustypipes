@@ -7,20 +7,7 @@ Rustypipes is a Rust library to implement Octopipes clients and servers.
 
 - [Rustypipes](#rustypipes)
   - [Build](#build)
-  - [Client Implementation](#client-implementation)
-  - [Server Implementation](#server-implementation)
-  - [Documentation](#documentation)
 
 ## Build
 
-## Client Implementation
-
-TODO
-
-## Server Implementation
-
-TODO
-
-## Documentation
-
-TODO
+The library documentation can be found at INSERT_LINK_HERE
