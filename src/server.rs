@@ -485,7 +485,11 @@ impl OctopipesServer {
                     Some(&rx_pipe),
                 );
                 match self.write_cap(client_id, data_out) {
-                    Err(err) => Err(err),
+                    Err(err) => {
+                        //Stop worker
+                        let _ = self.stop_worker(client_id);
+                        Err(err)
+                    },
                     Ok(..) => Ok(OctopipesCapMessage::Subscription),
                 }
             }
