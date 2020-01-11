@@ -13,7 +13,3 @@ bitflags = "1.2.1"
 [lib]
 name = "rustypipes"
 path = "src/lib.rs"
-
-[[bin]]
-name = "rustypipes-clients"
-path = "src/main.rs"

@@ -7,6 +7,7 @@
 //! 
 //! ```
 //! extern crate rustypipes;
+//! use std::time::Duration;
 //! 
 //! //Instance new client
 //! let mut client: rustypipes::OctopipesClient = rustypipes::OctopipesClient::new(String::from("myclient"), String::from("/tmp/cap.fifo"), rustypipes::OctopipesProtocolVersion::Version1);
@@ -43,6 +44,8 @@
 //! 
 //! ```
 //! extern crate rustypipes;
+//! use std::time::Duration;
+//! use std::thread::sleep;
 //! 
 //! //Instance a server
 //! let mut server: rustypipes::OctopipesServer = rustypipes::OctopipesServer::new(rustypipes::OctopipesProtocolVersion::Version1, String::from("/tmp/cap.fifo"), String::from("/tmp/clients/"));
