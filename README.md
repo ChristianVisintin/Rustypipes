@@ -1,5 +1,7 @@
 # Rustypipes
 
+[![Crates.io](https://img.shields.io/badge/crates.io-v0.1.0-orange.svg)](https://crates.io/crates/rustypipes)
+
 Current Version: 0.1.0 (11/01/2020)
 Developed by *Christian Visintin*
 
