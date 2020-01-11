@@ -3,6 +3,11 @@ name = "rustypipes"
 version = "0.1.0"
 authors = ["ChristianVisintin <christian.visintin1997@gmail.com>"]
 edition = "2018"
+license = "MIT"
+license_file = "LICENSE"
+description = "Rust library to implement Octopipes clients and servers"
+homepage = "https://github.com/ChristianVisintin/Octopipes"
+repository = "https://github.com/ChristianVisintin/Octopipes"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
