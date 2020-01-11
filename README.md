@@ -29,7 +29,7 @@ Implementing an Octopipes Client is pretty much simple and requires only the fol
 
 Initialize the client
 
-```rs
+```rust
 let cap_pipe: String = String::from("/tmp/cap.fifo");
 let mut client: rustypipes::OctopipesClient = rustypipes::OctopipesClient::new(
     String::from("myclient-123somerandomchars456"),
@@ -40,7 +40,7 @@ let mut client: rustypipes::OctopipesClient = rustypipes::OctopipesClient::new(
 
 Subscribe to the server
 
-```rs
+```rust
 let my_groups: Vec<String> = vec![String::from("myclient"), String::from("BROADCAST")];
 match client.subscribe(&my_groups) {
   Ok(cap_error) => {
@@ -57,7 +57,7 @@ match client.subscribe(&my_groups) {
 
 Wait for incoming messages
 
-```rs
+```rust
 //Start client loop
 if let Err(error) = client.loop_start() {
     panic!("Couldn't start client loop: {}\n", error);
@@ -87,7 +87,7 @@ loop {
 
 Send a message
 
-```rs
+```rust
 let mydata: Vec<u8> = vec![0x01, 0x02, 0x03, 0x04];
 if let Err(error) = client.send(&String::from("SomeRemote"), mydata) {
     panic!("Error while trying to send data: {}\n", error);
@@ -96,7 +96,7 @@ if let Err(error) = client.send(&String::from("SomeRemote"), mydata) {
 
 Then, when you're done, unsubscribe from server and terminate the client
 
-```rs
+```rust
 if let Err(error) = client.unsubscribe() {
     panic!("Error while client was trying to unsubscribe: {}\n", error);
 }
@@ -108,7 +108,7 @@ Rustypipes is designed to achieve the implementation of an Octopipes Server in t
 
 Initialize the Server
 
-```rs
+```rust
 let cap_pipe: String = String::from("/tmp/cap.fifo");
 let client_folder: String = String::from("/tmp/clients/");
 let mut server: rustypipes::OctopipesServer = rustypipes::OctopipesServer::new(
@@ -122,7 +122,7 @@ Start the CAP listener
 
 the CAP listener will just start a thread which will listen on the CAP for new messages, once a new message is received this will be able to be retrieved with cap process functions as we'll see later.
 
-```rs
+```rust
 if let Err(error) = server.start_cap_listener() {
     panic!("Could not start CAP listener: {}", error);
 }
@@ -132,7 +132,7 @@ Server Main Loop
 
 These two simple functions will handle for you all the tasks the server has to achieve. Try to call this functions often (about each 100ms or less).
 
-```rs
+```rust
 loop {
     //This function will check if there's any message available on the CAP
     //If there's a message available it will handle the request for you automatically
@@ -153,7 +153,7 @@ loop {
 
 Terminate the server
 
-```rs
+```rust
 if let Err(error) = server.stop_server() {
     panic!("Could not stop Server: {}\n", error);
 }
