@@ -5,7 +5,7 @@ authors = ["ChristianVisintin <christian.visintin1997@gmail.com>"]
 edition = "2018"
 license = "MIT"
 license_file = "LICENSE"
-description = "Rust library to implement Octopipes clients and servers"
+description = "Rustypipes is a Rust library to implement Octopipes clients and servers."
 homepage = "https://github.com/ChristianVisintin/Octopipes"
 repository = "https://github.com/ChristianVisintin/Octopipes"
 
