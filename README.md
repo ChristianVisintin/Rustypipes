@@ -1,6 +1,6 @@
 # Rustypipes
 
-[![Crates.io](https://img.shields.io/badge/crates.io-v0.1.0-orange.svg)](https://crates.io/crates/rustypipes)
+[![Crates.io](https://img.shields.io/badge/crates.io-v0.1.1-orange.svg)](https://crates.io/crates/rustypipes)
 
 Current Version: 0.1.1 (12/01/2020)
 Developed by *Christian Visintin*
@@ -25,7 +25,7 @@ rustypipes = "0.1.1"
     - [0.1.1 (12/01/2020)](#011-12012020)
   - [License](#license)
 
-The library documentation can be found at <https://docs.rs/unix-named-pipe/0.1.0/rustypipes/>
+The library documentation can be found at <https://docs.rs/unix-named-pipe/0.1.1/rustypipes/>
 
 ---
 
