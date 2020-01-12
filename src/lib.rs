@@ -109,7 +109,7 @@ use std::thread;
 #[macro_use]
 extern crate bitflags;
 
-pub const RUSTYPIPES_VERSION: &str = "0.1.0";
+pub const RUSTYPIPES_VERSION: &str = "0.1.1";
 pub const RUSTYPIPES_VERSION_MAJOR: i32 = 0;
 pub const RUSTYPIPES_VERSION_MINOR: i32 = 1;
 

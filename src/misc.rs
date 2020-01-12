@@ -111,6 +111,7 @@ impl OctopipesError {
             OctopipesError::ThreadAlreadyRunning => "Client loop Thread is already running",
             OctopipesError::ThreadError => "Thread error",
             OctopipesError::UnsupportedVersion => "Unsupported protocol version",
+            OctopipesError::WriteFailed => "Could not write to pipe",
             _ => "Unknown error"
         }
     }
@@ -145,6 +146,7 @@ impl OctopipesServerError {
             OctopipesServerError::WorkerNotFound => "The requested Worker couldn't be found",
             OctopipesServerError::WorkerExists => "The requested Worker already exists",
             OctopipesServerError::WorkerNotRunning => "This worker is not running",
+            OctopipesServerError::WriteFailed => "Could not write to pipe",
             OctopipesServerError::UnsupportedVersion => "Unsupported protocol version",
             _ => "Unknown error"
         }

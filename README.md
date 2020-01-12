@@ -2,28 +2,32 @@
 
 [![Crates.io](https://img.shields.io/badge/crates.io-v0.1.0-orange.svg)](https://crates.io/crates/rustypipes)
 
-Current Version: 0.1.0 (11/01/2020)
+Current Version: 0.1.1 (12/01/2020)
 Developed by *Christian Visintin*
 
 Rustypipes is a Rust library to implement Octopipes clients and servers.
 
 ```sh
-cargo add rustypipes 0.1.0
+cargo add rustypipes 0.1.1
 ```
 
 or
 
 ```toml
 [dependencies]
-rustypipes = "0.1.0"
+rustypipes = "0.1.1"
 ```
 
 - [Rustypipes](#rustypipes)
   - [Client Implementation](#client-implementation)
   - [Server Implementation](#server-implementation)
+  - [Changelog](#changelog)
+    - [0.1.1 (12/01/2020)](#011-12012020)
   - [License](#license)
 
 The library documentation can be found at <https://docs.rs/unix-named-pipe/0.1.0/rustypipes/>
+
+---
 
 ## Client Implementation
 
@@ -162,6 +166,16 @@ if let Err(error) = server.stop_server() {
 //You could also just call, since drop trait is implemented and stop the server gracefully
 //drop(server);
 ```
+
+---
+
+## Changelog
+
+### 0.1.1 (12/01/2020)
+
+- Added missing error description for "Write failed"
+
+---
 
 ## License
 
