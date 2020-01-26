@@ -1,11 +1,11 @@
 # Rustypipes
 
-[![Crates.io](https://img.shields.io/badge/crates.io-v0.1.1-orange.svg)](https://crates.io/crates/rustypipes)
+[![License: MIT](https://img.shields.io/badge/License-MIT-teal.svg)](https://opensource.org/licenses/MIT) [![Stars](https://img.shields.io/github/stars/ChristianVisintin/Rustypipes.svg)](https://github.com/ChristianVisintin/Rustypipes) [![Issues](https://img.shields.io/github/issues/ChristianVisintin/Rustypipes.svg)](https://github.com/ChristianVisintin/Rustypipes) [![Build](https://api.travis-ci.org/ChristianVisintin/Rustypipes.svg?branch=master)](https://travis-ci.org/ChristianVisintin/Rustypipes) [![Crates.io](https://img.shields.io/badge/crates.io-v0.1.1-orange.svg)](https://crates.io/crates/rustypipes)
 
 Current Version: 0.1.1 (12/01/2020)
 Developed by *Christian Visintin*
 
-Rustypipes is a Rust library to implement Octopipes clients and servers.
+Rustypipes is a Rust library to implement [Octopipes](https://github.com/ChristianVisintin/Octopipes) clients and servers.
 
 ```sh
 cargo add rustypipes 0.1.1
