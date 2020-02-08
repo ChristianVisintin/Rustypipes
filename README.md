@@ -25,7 +25,7 @@ rustypipes = "0.1.1"
     - [0.1.1 (12/01/2020)](#011-12012020)
   - [License](#license)
 
-The library documentation can be found at <https://docs.rs/unix-named-pipe/0.1.1/rustypipes/>
+The library documentation can be found at <https://docs.rs/rustypipes/0.1.1/rustypipes/>
 
 ---
 
