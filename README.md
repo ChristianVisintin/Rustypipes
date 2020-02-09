@@ -15,7 +15,7 @@ or
 
 ```toml
 [dependencies]
-rustypipes = "0.1.1"
+rustypipes = "0.2.0"
 ```
 
 - [Rustypipes](#rustypipes)
