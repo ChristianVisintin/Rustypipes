@@ -120,11 +120,17 @@ mod tests {
         assert_eq!(message.get_remote().unwrap(), remote);
         assert_eq!(message.get_version(), OctopipesProtocolVersion::Version1);
         assert_eq!(message.get_ttl(), 60);
+        assert_eq!(message.get_version(), OctopipesProtocolVersion::Version1);
         let msg_data: &Vec<u8> = message.get_data();
         assert_eq!(msg_data[0], 0x00);
         assert_eq!(msg_data[1], 0x01);
         assert_eq!(msg_data[2], 0x02);
         assert_eq!(msg_data[3], 0x03);
         assert_eq!(msg_data[4], 0x04);
+        //Test message without origin/remote
+        let data: Vec<u8> = vec![0x00, 0x01, 0x02, 0x03, 0x04];
+        let message = OctopipesMessage::new(&OctopipesProtocolVersion::Version1, &None, &None, 60, OctopipesOptions::ACK, data);
+        assert!(message.remote.is_none());
+        assert!(message.origin.is_none());
     }
 }
