@@ -100,20 +100,23 @@ impl OctopipesServer {
         if self.cap_listener.is_some() {
             return Err(OctopipesServerError::ThreadAlreadyRunning);
         }
-        //Create directory for clients
-        if let Err(_) = std::fs::create_dir_all(self.client_folder.clone()) {
-            return Err(OctopipesServerError::BadClientDir)
-        }
-        //Delete all pipes in client folder first
-        if let Ok(files) = std::fs::read_dir(self.client_folder.clone()) {
-            //Delete all files
-            for file_res in files {
-                if let Ok(file) = file_res {
-                    let file_path = file.path();
-                    if file_path.is_file() {
-                        let _ = std::fs::remove_file(file_path);
-                    }
-                } 
+        //Create directory for clients (Unix, linux, macos only)
+        if cfg!(any(unix, linux, macos)) {
+            if let Err(_) = std::fs::create_dir_all(self.client_folder.clone()) {
+                return Err(OctopipesServerError::BadClientDir)
+            }
+
+            //Delete all pipes in client folder first
+            if let Ok(files) = std::fs::read_dir(self.client_folder.clone()) {
+                //Delete all files
+                for file_res in files {
+                    if let Ok(file) = file_res {
+                        let file_path = file.path();
+                        if file_path.is_file() {
+                            let _ = std::fs::remove_file(file_path);
+                        }
+                    } 
+                }
             }
         }
         //Create CAP copy
@@ -895,5 +898,120 @@ impl Subscription {
     /// `is_subscribed` returns wether groups contains the provided string
     fn is_subscribed(&self, to_find: &String) -> bool {
         self.groups.contains(to_find)
+    }
+}
+
+//@! Tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    //Refer to production test to have a working environment
+    #[test]
+    fn test_server() {
+        //Instantiate server
+        let cap_pipe: String = String::from("/tmp/pipes/cap-pipe.pipe");
+        let client_folder: String = String::from("/tmp/pipes/clients/");
+        let mut server = OctopipesServer::new(OctopipesProtocolVersion::Version1, cap_pipe, client_folder);
+        //Set server callbacks
+        server.set_on_subscription(on_subscription);
+        server.set_on_unsubscription(on_unsubscription);
+        //Start CAP listener
+        if let Err(error) = server.start_cap_listener() {
+            panic!("Could not start CAP listener: {}", error);
+        }
+        //Lock / Unlock CAP
+        server.lock_cap();
+        server.unlock_cap();
+        //Add worker
+        let clid: String = String::from("test-client");
+        let subscriptions: Vec<String> = vec![String::from("TEST-CLIENT"), String::from("BROADCAST")];
+        let pipe_tx: String = String::from("/tmp/pipes/clients/test-client_tx.pipe");
+        let pipe_rx: String = String::from("/tmp/pipes/clients/test-client_rx.pipe");
+        if let Err(error) = server.start_worker(clid.clone(), subscriptions, pipe_tx, pipe_rx) {
+            panic!("Could not start server worker: {}", error);
+        }
+        //Check if worker is subscribed
+        if let None = server.is_subscribed(clid.clone()) {
+            panic!("{} is not subscribed according to the server, but should be", clid);
+        }
+        assert!(server.worker_exists(&clid));
+        //Get worker subscriptions
+        let subscriptions: Vec<String> = vec![String::from("TEST-CLIENT"), String::from("BROADCAST")];
+        if let Some(subscriptions_server) = server.get_subscriptions(clid.clone()) {
+            //Verify subscriptions
+            assert_eq!(subscriptions_server[0], subscriptions[0]);
+            assert_eq!(subscriptions_server[1], subscriptions[1]);
+        } else {
+            panic!("{} is not subscribed according to the server, but should be", clid);
+        }
+        //Match subscription
+        let workers: Vec<&OctopipesServerWorker> = server.match_subscription(&String::from("BROADCAST"));
+        assert_eq!(workers.len(), 1);
+        let workers: Vec<&OctopipesServerWorker> = server.match_subscription(&String::from("NOBODY-IS-SUBSCRIBED-TO-THIS"));
+        assert_eq!(workers.len(), 0);
+        //Stop Server listeners
+        if let Err(error) = server.stop_server() {
+            panic!("Could not stop Server listeners: {}", error);
+        }
+    }
+
+    #[test]
+    fn test_worker() {
+        //Instantiate worker
+        let clid: String = String::from("test-client");
+        let subscriptions: Vec<String> = vec![String::from("TEST-CLIENT"), String::from("BROADCAST")];
+        let pipe_tx: String = String::from("/tmp/pipes/test-client_tx.pipe");
+        let pipe_rx: String = String::from("/tmp/pipes/test-client_rx.pipe");
+        let mut worker: OctopipesServerWorker = match OctopipesServerWorker::new(clid, subscriptions, pipe_tx, pipe_rx) {
+            Ok(worker) => worker,
+            Err(error) => {
+                panic!("Could not start octopipes server worker: {}", error);
+            }
+        };
+        //Verify subscription
+        assert!(worker.is_subscribed(&String::from("TEST-CLIENT")));
+        assert!(worker.is_subscribed(&String::from("BROADCAST")));
+        //Try to get message, should return None
+        let message: Option<OctopipesMessage> = match worker.get_next_message() {
+            Err(error) => {
+                panic!("get_next_message() returned error: {}", error);
+            },
+            Ok(msg_opt) => msg_opt
+        };
+        assert!(message.is_none()); //Should be None
+        //Try to send a message (won't work)
+        let origin: String = String::from("foo");
+        let remote: String = String::from("bar");
+        let data: Vec<u8> = vec![0x00, 0x01, 0x02, 0x03, 0x04];
+        let message = OctopipesMessage::new(&OctopipesProtocolVersion::Version1, &Some(origin.clone()), &Some(remote.clone()), 1, OctopipesOptions::empty(), data);
+        if let Err(error) = worker.send(&message) {
+            assert_eq!(error, OctopipesServerError::WriteFailed, "Worker send should have returned WriteFailed, but returned {}", error);
+        } else {
+            panic!("Worker send should have returned WriteFailed, but returned OK");
+        }
+        //Stop worker
+        if let Err(error) = worker.stop_worker() {
+            panic!("Worker stop_worker() returned error: {}", error);
+        }
+    }
+
+    #[test]
+    fn test_subscription() {
+        let subscriptions: Vec<String> = vec![String::from("TEST-CLIENT"), String::from("BROADCAST")];
+        let subscription = Subscription::new(subscriptions);
+        //Verify subscription
+        assert!(subscription.is_subscribed(&String::from("TEST-CLIENT")));
+        assert!(subscription.is_subscribed(&String::from("BROADCAST")));
+    }
+
+    //Callbacks
+    fn on_subscription(clid: String) {
+        println!("Client {} subscribed to the server!", clid);
+    }
+
+    fn on_unsubscription(clid: String) {
+        println!("Client {} unsubcribed from the server!", clid);
     }
 }
