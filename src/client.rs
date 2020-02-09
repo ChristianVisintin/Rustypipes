@@ -1,6 +1,6 @@
 //! ## Client
 //!
-//! `client` is the module which takes care of managin the OctopipesClient struct and
+//! `client` is the module which takes care of managing the OctopipesClient struct and
 //! then all the functions useful for the user to interface with an Octopipes Server
 
 //
@@ -26,21 +26,21 @@
 // SOFTWARE.
 //
 
-use super::OctopipesCapError;
-use super::OctopipesCapMessage;
-use super::OctopipesClient;
-use super::OctopipesError;
-use super::OctopipesMessage;
-use super::OctopipesOptions;
-use super::OctopipesProtocolVersion;
-use super::OctopipesState;
+use crate::OctopipesCapError;
+use crate::OctopipesCapMessage;
+use crate::OctopipesClient;
+use crate::OctopipesError;
+use crate::OctopipesMessage;
+use crate::OctopipesOptions;
+use crate::OctopipesProtocolVersion;
+use crate::OctopipesState;
 
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
-use super::cap;
-use super::pipes;
-use super::serializer;
+use crate::cap;
+use crate::pipes;
+use crate::serializer;
 
 impl OctopipesClient {
     /// ### OctopipesClient Constructor

@@ -25,10 +25,10 @@
 // SOFTWARE.
 //
 
-use super::OctopipesError;
-use super::OctopipesMessage;
-use super::OctopipesOptions;
-use super::OctopipesProtocolVersion;
+use crate::OctopipesError;
+use crate::OctopipesMessage;
+use crate::OctopipesOptions;
+use crate::OctopipesProtocolVersion;
 
 const SOH: u8 = 0x01;
 const STX: u8 = 0x02;

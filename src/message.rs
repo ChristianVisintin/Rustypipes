@@ -25,9 +25,9 @@
 // SOFTWARE.
 //
 
-use super::OctopipesMessage;
-use super::OctopipesOptions;
-use super::OctopipesProtocolVersion;
+use crate::OctopipesMessage;
+use crate::OctopipesOptions;
+use crate::OctopipesProtocolVersion;
 
 impl OctopipesMessage {
     /// ### OctopipesMessage Constructor

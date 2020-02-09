@@ -25,12 +25,12 @@
 // SOFTWARE.
 //
 
-use super::OctopipesCapError;
-use super::OctopipesCapMessage;
-use super::OctopipesError;
-use super::OctopipesProtocolVersion;
-use super::OctopipesOptions;
-use super::OctopipesServerError;
+use crate::OctopipesCapError;
+use crate::OctopipesCapMessage;
+use crate::OctopipesError;
+use crate::OctopipesProtocolVersion;
+use crate::OctopipesOptions;
+use crate::OctopipesServerError;
 
 use std::fmt;
 

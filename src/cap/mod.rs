@@ -25,9 +25,9 @@
 // SOFTWARE.
 //
 
-use super::OctopipesCapError;
-use super::OctopipesCapMessage;
-use super::OctopipesError;
+use crate::OctopipesCapError;
+use crate::OctopipesCapMessage;
+use crate::OctopipesError;
 
 /// ### encode_subscription
 ///
@@ -236,6 +236,7 @@ pub(super) fn decode_unsubscription(data: &Vec<u8>) -> Result<(), OctopipesError
 
 //@! Tests
 
+#[cfg_attr(tarpaulin, skip)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -657,6 +658,26 @@ mod tests {
                 assert_eq!(error, OctopipesError::BadPacket, "Subscribe NOK should have returned BAD PACKET, but returned {}", error);
             }
         }
+        //Create a 1 byte length subscription packet
+        let payload: Vec<u8> = vec![0x01];
+        match decode_subscription(&payload) {
+            Ok(..) => {
+                panic!("Decode should have failed");
+            },
+            Err(error) => {
+                assert_eq!(error, OctopipesError::BadPacket, "Subscribe NOK should have returned BAD PACKET, but returned {}", error);
+            }
+        }
+        //Test a NON subscribe packet
+        let payload: Vec<u8> = vec![0xf0, 0x02, 0x03, 'S' as u8, 'Y' as u8, 'S' as u8];
+        match decode_subscription(&payload) {
+            Ok(..) => {
+                panic!("Decode should have failed");
+            },
+            Err(error) => {
+                assert_eq!(error, OctopipesError::BadPacket, "Subscribe NOK should have returned BAD PACKET, but returned {}", error);
+            }
+        }
     }
 
     #[test]
@@ -708,6 +729,46 @@ mod tests {
                 assert_eq!(err, OctopipesError::BadPacket, "Decode assignment should have returned BadPacket but returned {}", err);
             }
         }
+        //Create a 1 byte length subscription packet
+        let payload: Vec<u8> = vec![0xff];
+        match decode_assignment(&payload) {
+            Ok(..) => {
+                panic!("Decode should have failed");
+            },
+            Err(error) => {
+                assert_eq!(error, OctopipesError::BadPacket, "Subscribe NOK should have returned BAD PACKET, but returned {}", error);
+            }
+        }
+        //Test a NON subscribe packet
+        let payload: Vec<u8> = vec![0xf0, 0x02, 0x03, 'S' as u8, 'Y' as u8, 'S' as u8];
+        match decode_assignment(&payload) {
+            Ok(..) => {
+                panic!("Decode should have failed");
+            },
+            Err(error) => {
+                assert_eq!(error, OctopipesError::BadPacket, "Subscribe NOK should have returned BAD PACKET, but returned {}", error);
+            }
+        }
+        //Cut TX pipe
+        let payload: Vec<u8> = vec![0xff, 0x00, 0x0c, 0x2f, 0x74];
+        match decode_assignment(&payload) {
+            Ok(..) => {
+                panic!("Decode should have failed");
+            },
+            Err(error) => {
+                assert_eq!(error, OctopipesError::BadPacket, "Subscribe NOK should have returned BAD PACKET, but returned {}", error);
+            }
+        }
+        //Cut RX pipe
+        let payload: Vec<u8> = vec![0xff, 0x00, 0x0c, 0x2f, 0x74, 0x6d, 0x70, 0x2f, 0x70, 0x69, 0x70, 0x65, 0x5f, 0x74, 0x78, 0x0c, 0x2f, 0x74, 0x6d, 0x70];
+        match decode_assignment(&payload) {
+            Ok(..) => {
+                panic!("Decode should have failed");
+            },
+            Err(error) => {
+                assert_eq!(error, OctopipesError::BadPacket, "Subscribe NOK should have returned BAD PACKET, but returned {}", error);
+            }
+        }
     }
 
     #[test]
@@ -733,6 +794,16 @@ mod tests {
             },
             Err(err) => {
                 assert_eq!(err, OctopipesError::BadPacket, "Decode unsubscription should have returned BadPacket but returned {}", err);
+            }
+        }
+        //Create a 0 byte length subscription packet
+        let payload: Vec<u8> = vec![];
+        match decode_unsubscription(&payload) {
+            Ok(..) => {
+                panic!("Decode should have failed");
+            },
+            Err(error) => {
+                assert_eq!(error, OctopipesError::BadPacket, "Subscribe NOK should have returned BAD PACKET, but returned {}", error);
             }
         }
     }
