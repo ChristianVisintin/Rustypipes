@@ -1,14 +1,14 @@
 # Rustypipes
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-teal.svg)](https://opensource.org/licenses/MIT) [![Stars](https://img.shields.io/github/stars/ChristianVisintin/Rustypipes.svg)](https://github.com/ChristianVisintin/Rustypipes) [![Issues](https://img.shields.io/github/issues/ChristianVisintin/Rustypipes.svg)](https://github.com/ChristianVisintin/Rustypipes) [![Build](https://api.travis-ci.org/ChristianVisintin/Rustypipes.svg?branch=master)](https://travis-ci.org/ChristianVisintin/Rustypipes) [![codecov](https://codecov.io/gh/ChristianVisintin/Rustypipes/branch/master/graph/badge.svg)](https://codecov.io/gh/ChristianVisintin/Rustypipes) [![Crates.io](https://img.shields.io/badge/crates.io-v0.1.1-orange.svg)](https://crates.io/crates/rustypipes)
+[![License: MIT](https://img.shields.io/badge/License-MIT-teal.svg)](https://opensource.org/licenses/MIT) [![Stars](https://img.shields.io/github/stars/ChristianVisintin/Rustypipes.svg)](https://github.com/ChristianVisintin/Rustypipes) [![Issues](https://img.shields.io/github/issues/ChristianVisintin/Rustypipes.svg)](https://github.com/ChristianVisintin/Rustypipes) [![Build](https://api.travis-ci.org/ChristianVisintin/Rustypipes.svg?branch=master)](https://travis-ci.org/ChristianVisintin/Rustypipes) [![codecov](https://codecov.io/gh/ChristianVisintin/Rustypipes/branch/master/graph/badge.svg)](https://codecov.io/gh/ChristianVisintin/Rustypipes) [![Crates.io](https://img.shields.io/badge/crates.io-v0.2.0-orange.svg)](https://crates.io/crates/rustypipes)
 
-Current Version: 0.1.1 (12/01/2020)
+Current Version: 0.2.0 (??/02/2020)
 Developed by *Christian Visintin*
 
 Rustypipes is a Rust library to implement [Octopipes](https://github.com/ChristianVisintin/Octopipes) clients and servers.
 
 ```sh
-cargo add rustypipes 0.1.1
+cargo add rustypipes 0.2.0
 ```
 
 or
@@ -22,10 +22,11 @@ rustypipes = "0.1.1"
   - [Client Implementation](#client-implementation)
   - [Server Implementation](#server-implementation)
   - [Changelog](#changelog)
+    - [0.2.0 (??/02/2020)](#020-022020)
     - [0.1.1 (12/01/2020)](#011-12012020)
   - [License](#license)
 
-The library documentation can be found at <https://docs.rs/rustypipes/0.1.1/rustypipes/>
+The library documentation can be found at <https://docs.rs/rustypipes/0.2.0/rustypipes/>
 
 ---
 
@@ -170,6 +171,14 @@ if let Err(error) = server.stop_server() {
 ---
 
 ## Changelog
+
+### 0.2.0 (??/02/2020)
+
+- Server callbacks
+  - on_subscription
+  - on_unsubscription
+- Windows support
+- Improved code coverage
 
 ### 0.1.1 (12/01/2020)
 
