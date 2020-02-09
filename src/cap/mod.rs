@@ -625,6 +625,16 @@ mod tests {
             "Unsubscribe message has wrong cap type: {}",
             get_cap_message_type(&payload).unwrap()
         );
+        //Test Bad Packets
+        let payload: Vec<u8> = vec![];
+        if let Ok(_) = get_cap_message_type(&payload) {
+            panic!("get_cap_message_type should have returned Error!!!");
+        };
+        //Test bad CAP type
+        let payload: Vec<u8> = vec![0xea];
+        if let Ok(_) = get_cap_message_type(&payload) {
+            panic!("get_cap_message_type should have returned Error!!!");
+        };
     }
 
     #[test]
@@ -715,6 +725,11 @@ mod tests {
             },
             Err(..) => panic!("Assignment decode shouldn't have returned error")
         }
+        //Create an assignment payload to decode with BAD CAP error
+        let payload: Vec<u8> = vec![0xff, 0xe0];
+        if let Ok(_) = decode_assignment(&payload) {
+            panic!("decode assignment should have returned error, but returned OK");
+        }
     }
 
     #[test]
@@ -751,6 +766,16 @@ mod tests {
         }
         //Cut TX pipe
         let payload: Vec<u8> = vec![0xff, 0x00, 0x0c, 0x2f, 0x74];
+        match decode_assignment(&payload) {
+            Ok(..) => {
+                panic!("Decode should have failed");
+            },
+            Err(error) => {
+                assert_eq!(error, OctopipesError::BadPacket, "Subscribe NOK should have returned BAD PACKET, but returned {}", error);
+            }
+        }
+        //Without RX pipe
+        let payload: Vec<u8> = vec![0xff, 0x00, 0x0c, 0x2f, 0x74, 0x6d, 0x70, 0x2f, 0x70, 0x69, 0x70, 0x65, 0x5f, 0x74, 0x78];
         match decode_assignment(&payload) {
             Ok(..) => {
                 panic!("Decode should have failed");
