@@ -153,14 +153,14 @@ mod tests {
                         for message in messages.iter() {
                             println!(
                                 "Received message from {}: {:?}",
-                                message.origin.as_ref().unwrap(),
-                                message.data
+                                message.get_origin().unwrap(),
+                                message.get_data()
                             );
                             assert_eq!(
-                                *message.origin.as_ref().unwrap(),
+                                *message.get_origin().unwrap(),
                                 String::from("test_client_w"),
                                 "Received message origin should be 'test_client_w', but is {}",
-                                message.origin.as_ref().unwrap()
+                                message.get_origin().unwrap()
                             );
                         }
                         if messages.len() > 0 {
