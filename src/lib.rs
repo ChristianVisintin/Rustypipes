@@ -5,7 +5,7 @@
 //! ## Examples
 //! ### Client
 //! 
-//! ```
+//! ```no_run
 //! extern crate rustypipes;
 //! use std::time::Duration;
 //! 
@@ -42,7 +42,7 @@
 //! 
 //! ### Server
 //! 
-//! ```
+//! ```no_run
 //! extern crate rustypipes;
 //! use std::time::Duration;
 //! use std::thread::sleep;
