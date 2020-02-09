@@ -1,6 +1,6 @@
 //! ## Server
 //!
-//! `server` is the module which takes care of managin the Octopipes Server struct and
+//! `server` is the module which takes care of managing the Octopipes Server struct and
 //! then all the functions useful to implement an Octopipes Server
 
 //
@@ -26,20 +26,20 @@
 // SOFTWARE.
 //
 
-use super::OctopipesCapError;
-use super::OctopipesCapMessage;
-use super::OctopipesMessage;
-use super::OctopipesOptions;
-use super::OctopipesProtocolVersion;
-use super::OctopipesServer;
-use super::OctopipesServerError;
-use super::OctopipesServerState;
-use super::OctopipesServerWorker;
-use super::Subscription;
+use crate::OctopipesCapError;
+use crate::OctopipesCapMessage;
+use crate::OctopipesMessage;
+use crate::OctopipesOptions;
+use crate::OctopipesProtocolVersion;
+use crate::OctopipesServer;
+use crate::OctopipesServerError;
+use crate::OctopipesServerState;
+use crate::OctopipesServerWorker;
+use crate::Subscription;
 
-use super::cap;
-use super::pipes;
-use super::serializer;
+use crate::cap;
+use crate::pipes;
+use crate::serializer;
 
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -62,6 +62,8 @@ impl OctopipesServer {
             cap_receiver: None,
             cap_listener: None,
             workers: Vec::new(),
+            on_subscription_fn: None,
+            on_unsubscription_fn: None
         }
     }
 
@@ -490,7 +492,13 @@ impl OctopipesServer {
                         let _ = self.stop_worker(client_id);
                         Err(err)
                     },
-                    Ok(..) => Ok(OctopipesCapMessage::Subscription),
+                    Ok(..) => {
+                        //Call callback
+                        if self.on_subscription_fn.is_some() {
+                            (self.on_subscription_fn.unwrap())(client_id.clone());
+                        }
+                        return Ok(OctopipesCapMessage::Subscription)
+                    }
                 }
             }
         }
@@ -503,7 +511,7 @@ impl OctopipesServer {
         &mut self,
         client_id: &String,
     ) -> Result<OctopipesCapMessage, OctopipesServerError> {
-        //Check if client is already subsribed
+        //Check if client is already subscribed
         let mut client_exists: bool = false;
         for worker in &self.workers {
             if *client_id == worker.client_id {
@@ -515,10 +523,14 @@ impl OctopipesServer {
         if !client_exists {
             return Err(OctopipesServerError::WorkerNotFound);
         }
+        //Call callback
+        if self.on_unsubscription_fn.is_some() {
+            (self.on_unsubscription_fn.unwrap())(client_id.clone());
+        }
         //Stop worker
         match self.stop_worker(client_id) {
             Ok(..) => Ok(OctopipesCapMessage::Unsubscription),
-            Err(err) => Err(err),
+            Err(err) => Err(err)
         }
     }
 
@@ -656,6 +668,20 @@ impl OctopipesServer {
             clients.push(worker.client_id.clone());
         }
         clients
+    }
+
+    /// ###  set_on_subscription
+    ///
+    /// `set_on_subscription` sets the function to call on a subscription from a client. The string argument is the client ID
+    pub fn set_on_subscription(&mut self, callback: fn(String)) {
+        self.on_subscription_fn = Some(callback);
+    }
+
+    /// ###  set_on_unsubscription
+    ///
+    /// `set_on_unsubscription` sets the function to call on an unsubscription from a client. The string argument is the client ID
+    pub fn set_on_unsubscription(&mut self, callback: fn(String)) {
+        self.on_unsubscription_fn = Some(callback);
     }
 
     //@! Privates

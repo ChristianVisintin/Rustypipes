@@ -44,6 +44,9 @@ mod tests {
             cap_pipe,
             client_folder,
         );
+        //Set server callbacks
+        server.set_on_subscription(on_subscribption);
+        server.set_on_unsubscription(on_unsubscription);
         //@! Start server
         if let Err(error) = server.start_cap_listener() {
             panic!("Could not start CAP listener: {}", error);
@@ -276,5 +279,14 @@ mod tests {
         if let Err(error) = server.stop_server() {
             panic!("Could not stop Server: {}\n", error);
         }
+    }
+
+    //Callbacks
+    fn on_subscribption(client_id: String) {
+        println!("ON_SUBSCRIBPTION_CALLBACK - Client {} subscribed!", client_id);
+    }
+
+    fn on_unsubscription(client_id: String) {
+        println!("ON_UNSUBSCRIBPTION_CALLBACK - Client {} unsubscribed!", client_id);
     }
 }

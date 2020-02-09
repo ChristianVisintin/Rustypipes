@@ -16,7 +16,7 @@
 //!     println!("Error while trying to subscribe: {}", error);
 //! }
 //! //Start loop (optional, a client could also only send messages)
-//! if let Err(error) = client.start_loop() {
+//! if let Err(error) = client.loop_start() {
 //!     println!("Error while trying to start loop: {}", error);
 //! }
 //! //In a loop get the next message
@@ -245,7 +245,10 @@ pub struct OctopipesServer {
     cap_listener: Option<thread::JoinHandle<()>>,
     cap_receiver: Option<mpsc::Receiver<Result<OctopipesMessage, OctopipesServerError>>>, //Receives OctopipesMessage from clients; responses are sent through methods
     //workers
-    workers: Vec<OctopipesServerWorker>
+    workers: Vec<OctopipesServerWorker>,
+    //Callbacks
+    on_subscription_fn: Option<fn(String)>,
+    on_unsubscription_fn: Option<fn(String)>
 }
 
 /// ### OctopipesServerWorker
