@@ -140,7 +140,7 @@ impl OctopipesServerError {
             OctopipesServerError::NoRecipient => "The provided message has no recipient",
             OctopipesServerError::OpenFailed => "Could not open the requested pipe",
             OctopipesServerError::ReadFailed => "Could not read from pipe",
-            OctopipesServerError::ThreadAlreadyRunning => "Client loop Thread is already running",
+            OctopipesServerError::ThreadAlreadyRunning => "Server CAP loop Thread is already running",
             OctopipesServerError::ThreadError => "Thread error",
             OctopipesServerError::WorkerAlreadyRunning => "The requested worker is already running",
             OctopipesServerError::WorkerNotFound => "The requested Worker couldn't be found",
@@ -204,5 +204,162 @@ impl fmt::Display for OctopipesCapError {
 impl fmt::Debug for OctopipesCapError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_protocol_version() {
+        let protocol_version: Option<OctopipesProtocolVersion> = OctopipesProtocolVersion::from_u8(0x01);
+        assert_eq!(protocol_version.unwrap(), OctopipesProtocolVersion::Version1);
+        let protocol_version: Option<OctopipesProtocolVersion> = OctopipesProtocolVersion::from_u8(0xf0);
+        assert!(protocol_version.is_none());
+    }
+
+    #[test]
+    fn test_cap_message() {
+        let cap_message: Option<OctopipesCapMessage> = OctopipesCapMessage::from_u8(0x01);
+        assert_eq!(cap_message.unwrap(), OctopipesCapMessage::Subscription);
+        assert_eq!(cap_message.unwrap().to_string(), String::from("SUBSCRIPTION"));
+        let cap_message: Option<OctopipesCapMessage> = OctopipesCapMessage::from_u8(0x02);
+        assert_eq!(cap_message.unwrap(), OctopipesCapMessage::Unsubscription);
+        assert_eq!(cap_message.unwrap().to_string(), String::from("UNSUBSCRIPTION"));
+        let cap_message: Option<OctopipesCapMessage> = OctopipesCapMessage::from_u8(0xff);
+        assert_eq!(cap_message.unwrap(), OctopipesCapMessage::Assignment);
+        assert_eq!(cap_message.unwrap().to_string(), String::from("ASSIGNMENT"));
+        println!("DEBUG: {:?}", cap_message);
+        let cap_message: Option<OctopipesCapMessage> = OctopipesCapMessage::from_u8(0xe0);
+        assert!(cap_message.is_none());
+    }
+
+    #[test]
+    fn test_cap_error() {
+        let cap_error: Option<OctopipesCapError> = OctopipesCapError::from_u8(0x00);
+        assert_eq!(cap_error.unwrap(), OctopipesCapError::NoError);
+        assert_eq!(cap_error.unwrap().to_string(), String::from("NoError"));
+        let cap_error: Option<OctopipesCapError> = OctopipesCapError::from_u8(0x01);
+        assert_eq!(cap_error.unwrap(), OctopipesCapError::NameAlreadyTaken);
+        assert_eq!(cap_error.unwrap().to_string(), String::from("NameAlreadyTaken"));
+        let cap_error: Option<OctopipesCapError> = OctopipesCapError::from_u8(0x02);
+        assert_eq!(cap_error.unwrap(), OctopipesCapError::FileSystemError);
+        assert_eq!(cap_error.unwrap().to_string(), String::from("FileSystemError"));
+        println!("DEBUG: {:?}", cap_error);
+        let cap_error: Option<OctopipesCapError> = OctopipesCapError::from_u8(0xe0);
+        assert!(cap_error.is_none());
+    }
+
+    #[test]
+    fn test_message_option() {
+        let message_options: OctopipesOptions = OctopipesOptions::from_u8(0x07); //7
+        assert!(message_options.intersects(OctopipesOptions::RCK));
+        assert!(message_options.intersects(OctopipesOptions::ACK));
+        assert!(message_options.intersects(OctopipesOptions::ICK));
+        let message_options: OctopipesOptions = OctopipesOptions::from_u8(0x03); //3
+        assert!(message_options.intersects(OctopipesOptions::RCK));
+        assert!(message_options.intersects(OctopipesOptions::ACK));
+        assert!(!message_options.intersects(OctopipesOptions::ICK));
+        let message_options: OctopipesOptions = OctopipesOptions::from_u8(0x01); //3
+        assert!(message_options.intersects(OctopipesOptions::RCK));
+        assert!(!message_options.intersects(OctopipesOptions::ACK));
+        assert!(!message_options.intersects(OctopipesOptions::ICK));
+        let message_options: OctopipesOptions = OctopipesOptions::from_u8(0x04); //4
+        assert!(!message_options.intersects(OctopipesOptions::RCK));
+        assert!(!message_options.intersects(OctopipesOptions::ACK));
+        assert!(message_options.intersects(OctopipesOptions::ICK));
+        let message_options: OctopipesOptions = OctopipesOptions::from_u8(0x05); //5
+        assert!(message_options.intersects(OctopipesOptions::RCK));
+        assert!(!message_options.intersects(OctopipesOptions::ACK));
+        assert!(message_options.intersects(OctopipesOptions::ICK));
+        //Print options
+        println!("{}", message_options);
+    }
+
+    #[test]
+    fn test_octopipes_error() {
+        let octopipes_error: OctopipesError = OctopipesError::Uninitialized;
+        assert_eq!(octopipes_error.to_string(), String::from("OctopipesClient is not initialized yet"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::Unknown);
+        let octopipes_error: OctopipesError = OctopipesError::BadChecksum;
+        assert_eq!(octopipes_error.to_string(), String::from("Packet has bad checksum"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::BadChecksum);
+        let octopipes_error: OctopipesError = OctopipesError::BadPacket;
+        assert_eq!(octopipes_error.to_string(), String::from("It was not possible to decode packet, since it contains bad data"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::BadPacket);
+        let octopipes_error: OctopipesError = OctopipesError::CapTimeout;
+        assert_eq!(octopipes_error.to_string(), String::from("CAP timeout"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::CapTimeout);
+        let octopipes_error: OctopipesError = OctopipesError::NoDataAvailable;
+        assert_eq!(octopipes_error.to_string(), String::from("There is not data available on pipe"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::Unknown);
+        let octopipes_error: OctopipesError = OctopipesError::NotSubscribed;
+        assert_eq!(octopipes_error.to_string(), String::from("The client must be subscribed to the server before receiving and sending messages"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::Unknown);
+        let octopipes_error: OctopipesError = OctopipesError::NotUnsubscribed;
+        assert_eq!(octopipes_error.to_string(), String::from("The client must be unsubscribed to perform this action"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::Unknown);
+        let octopipes_error: OctopipesError = OctopipesError::OpenFailed;
+        assert_eq!(octopipes_error.to_string(), String::from("Could not open the requested pipe"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::OpenFailed);
+        let octopipes_error: OctopipesError = OctopipesError::ReadFailed;
+        assert_eq!(octopipes_error.to_string(), String::from("Could not read from pipe"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::ReadFailed);
+        let octopipes_error: OctopipesError = OctopipesError::ThreadAlreadyRunning;
+        assert_eq!(octopipes_error.to_string(), String::from("Client loop Thread is already running"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::Unknown);
+        let octopipes_error: OctopipesError = OctopipesError::ThreadError;
+        assert_eq!(octopipes_error.to_string(), String::from("Thread error"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::Unknown);
+        let octopipes_error: OctopipesError = OctopipesError::UnsupportedVersion;
+        assert_eq!(octopipes_error.to_string(), String::from("Unsupported protocol version"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::UnsupportedVersion);
+        let octopipes_error: OctopipesError = OctopipesError::WriteFailed;
+        assert_eq!(octopipes_error.to_string(), String::from("Could not write to pipe"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::WriteFailed);
+        let octopipes_error: OctopipesError = OctopipesError::Unknown;
+        assert_eq!(octopipes_error.to_string(), String::from("Unknown error"));
+        assert_eq!(octopipes_error.to_server_error(), OctopipesServerError::Unknown);
+        println!("{:?}", octopipes_error);
+    }
+
+    #[test]
+    fn test_octopipes_server_error() {
+        let octopipes_error: OctopipesServerError = OctopipesServerError::Uninitialized;
+        assert_eq!(octopipes_error.to_string(), String::from("OctopipesServer is not initialized yet"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::BadChecksum;
+        assert_eq!(octopipes_error.to_string(), String::from("Packet has bad checksum"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::BadClientDir;
+        assert_eq!(octopipes_error.to_string(), String::from("Could not create client directory"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::BadPacket;
+        assert_eq!(octopipes_error.to_string(), String::from("It was not possible to decode packet, since it contains bad data"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::CapTimeout;
+        assert_eq!(octopipes_error.to_string(), String::from("CAP timeout"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::NoRecipient;
+        assert_eq!(octopipes_error.to_string(), String::from("The provided message has no recipient"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::OpenFailed;
+        assert_eq!(octopipes_error.to_string(), String::from("Could not open the requested pipe"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::ReadFailed;
+        assert_eq!(octopipes_error.to_string(), String::from("Could not read from pipe"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::ThreadAlreadyRunning;
+        assert_eq!(octopipes_error.to_string(), String::from("Server CAP loop Thread is already running"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::ThreadError;
+        assert_eq!(octopipes_error.to_string(), String::from("Thread error"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::WorkerAlreadyRunning;
+        assert_eq!(octopipes_error.to_string(), String::from("The requested worker is already running"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::WorkerExists;
+        assert_eq!(octopipes_error.to_string(), String::from("The requested Worker already exists"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::WorkerNotFound;
+        assert_eq!(octopipes_error.to_string(), String::from("The requested Worker couldn't be found"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::WorkerNotRunning;
+        assert_eq!(octopipes_error.to_string(), String::from("This worker is not running"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::WriteFailed;
+        assert_eq!(octopipes_error.to_string(), String::from("Could not write to pipe"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::UnsupportedVersion;
+        assert_eq!(octopipes_error.to_string(), String::from("Unsupported protocol version"));
+        let octopipes_error: OctopipesServerError = OctopipesServerError::Unknown;
+        assert_eq!(octopipes_error.to_string(), String::from("Unknown error"));
+        println!("DEBUG: {:?}; DISPLAY: {}", octopipes_error, octopipes_error);
     }
 }
