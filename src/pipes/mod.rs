@@ -172,14 +172,19 @@ mod tests {
     #[test]
     fn test_pipe_create_and_delete() {
         //Try to create a pipe in /tmp/pipe_test
-        match pipe_create(&String::from("/tmp/pipe_test")) {
-            Ok(_) => println!("Pipe created with success"),
-            Err(ioerr) => panic!("Could not create pipe: {}", ioerr),
+        if let Err(ioerr) = pipe_create(&String::from("/tmp/pipe_test")) {
+            panic!("Could not create pipe: {}", ioerr)
+        }
+        //Try to recreate
+        if let Err(ioerr) = pipe_create(&String::from("/tmp/pipe_test")) {
+            panic!("Could not create pipe: {}", ioerr)
         }
         //Then delete it
-        match pipe_delete(&String::from("/tmp/pipe_test")) {
-            Ok(_) => println!("Pipe deleted with success"),
-            Err(ioerr) => panic!("Could not delete previously created pipe: {}", ioerr),
+        if let Err(ioerr) =  pipe_delete(&String::from("/tmp/pipe_test")) {
+            panic!("Could not delete previously created pipe: {}", ioerr)
+        }
+        if let Ok(_) = pipe_delete(&String::from("/tmp/pipe_test")) {
+            panic!("Pipe_delete returned oK while removing already deleted pipe")
         }
     }
 
@@ -310,6 +315,13 @@ mod tests {
         match pipe_delete(&String::from("/tmp/pipe_write_noendpoint")) {
             Ok(_) => println!("Pipe deleted with success"),
             Err(ioerr) => panic!("Could not delete previously created pipe: {}", ioerr),
+        }
+    }
+
+    #[test]
+    fn test_pipe_read_bad() {
+        if let Ok(_) = pipe_read(&String::from("/tmp/not-existing-pipe"), 500) {
+            panic!("Read from not-existing pipe returned oK");
         }
     }
 }
