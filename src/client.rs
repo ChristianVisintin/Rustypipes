@@ -114,7 +114,7 @@ impl OctopipesClient {
                                                 if message.options.intersects(OctopipesOptions::RCK) {
                                                     //if RCK is set, send ACK back
                                                     let message_origin: Option<String> =
-                                                        match message.origin.as_ref() {
+                                                        match message.get_origin() {
                                                             Some(origin) => Some(origin.clone()),
                                                             None => None,
                                                         };
@@ -217,13 +217,13 @@ impl OctopipesClient {
                                     Err(err) => Err(err),
                                     Ok(response) => {
                                         //Check if message type is ASSIGNMENT
-                                        match cap::get_cap_message_type(&response.data) {
+                                        match cap::get_cap_message_type(response.get_data()) {
                                             Ok(message_type) => {
                                                 match message_type {
                                                     OctopipesCapMessage::Assignment => {
                                                         //Ok, is an ASSIGNMENT
                                                         //Parse assignment params
-                                                        match cap::decode_assignment(&response.data) {
+                                                        match cap::decode_assignment(response.get_data()) {
                                                             Ok((cap_error, pipe_tx, pipe_rx)) => {
                                                                 //Assign params
                                                                 if cap_error != OctopipesCapError::NoError {

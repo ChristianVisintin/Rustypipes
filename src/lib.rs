@@ -187,7 +187,7 @@ bitflags! {
 ///
 /// `OctopipesProtocolVersion` describes the protocol version used by the client
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, std::fmt::Debug)]
 pub enum OctopipesProtocolVersion {
     Version1 = 1,
 }
@@ -198,11 +198,11 @@ pub enum OctopipesProtocolVersion {
 
 pub struct OctopipesMessage {
     version: OctopipesProtocolVersion,
-    pub origin: Option<String>,
-    pub remote: Option<String>,
+    origin: Option<String>,
+    remote: Option<String>,
     ttl: u8,
     options: OctopipesOptions,
-    pub data: Vec<u8>,
+    data: Vec<u8>,
 }
 
 /// ### OctopipesClient

@@ -324,10 +324,10 @@ impl OctopipesServer {
         message: &OctopipesMessage,
     ) -> Result<(), (Option<String>, OctopipesServerError)> {
         //Found worker where to dispatch the message
-        if message.remote.is_none() {
+        if message.get_remote().is_none() {
             return Err((None, OctopipesServerError::NoRecipient));
         }
-        let recipient: String = message.remote.as_ref().unwrap().clone();
+        let recipient: String = message.get_remote().unwrap().clone();
         let workers_associated: Vec<&OctopipesServerWorker> = self.match_subscription(&recipient);
         //For each associated worker, send the message out
         for worker in workers_associated {
@@ -412,18 +412,18 @@ impl OctopipesServer {
     ) -> Result<OctopipesCapMessage, OctopipesServerError> {
         //Get message origin, if None, return error
         let origin: String;
-        match &message.origin {
+        match message.get_origin() {
             None => return Err(OctopipesServerError::NoRecipient),
             Some(client) => origin = client.clone(),
         }
         //Get message type
-        match cap::get_cap_message_type(&message.data) {
+        match cap::get_cap_message_type(message.get_data()) {
             Err(err) => Err(err.to_server_error()),
             Ok(cap_message) => {
                 match cap_message {
                     OctopipesCapMessage::Subscription => {
                         //Parse subscription message
-                        match cap::decode_subscription(&message.data) {
+                        match cap::decode_subscription(message.get_data()) {
                             Err(err) => Err(err.to_server_error()),
                             Ok(mut groups) => {
                                 //@! Very important, add client id to groups
@@ -434,7 +434,7 @@ impl OctopipesServer {
                     }
                     OctopipesCapMessage::Unsubscription => {
                         //Parse unsubscription
-                        match cap::decode_unsubscription(&message.data) {
+                        match cap::decode_unsubscription(message.get_data()) {
                             Err(err) => Err(err.to_server_error()),
                             Ok(..) => self.manage_unsubscription(&origin),
                         }
