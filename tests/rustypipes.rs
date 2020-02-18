@@ -117,7 +117,7 @@ mod tests {
                             }
                             _ => {
                                 println!("Client_w couldn't subscribe, CAP error: {}\n", cap_error);
-                                sleep(Duration::from_millis(500));
+                                sleep(Duration::from_millis(1000));
                                 continue;
                             }
                         },
@@ -126,7 +126,7 @@ mod tests {
                                 "Error while client_w was trying to subscribe to server: {}\n",
                                 error
                             );
-                            sleep(Duration::from_millis(500));
+                            sleep(Duration::from_millis(1000));
                             continue;
                         }
                     }
