@@ -230,7 +230,7 @@ mod tests {
         let cap_message: Option<OctopipesCapMessage> = OctopipesCapMessage::from_u8(0xff);
         assert_eq!(cap_message.unwrap(), OctopipesCapMessage::Assignment);
         assert_eq!(cap_message.unwrap().to_string(), String::from("ASSIGNMENT"));
-        println!("DEBUG: {:?}", cap_message);
+        println!("DEBUG: {:?}; DISPLAY: {}", cap_message.unwrap(), cap_message.unwrap());
         let cap_message: Option<OctopipesCapMessage> = OctopipesCapMessage::from_u8(0xe0);
         assert!(cap_message.is_none());
     }
@@ -246,7 +246,7 @@ mod tests {
         let cap_error: Option<OctopipesCapError> = OctopipesCapError::from_u8(0x02);
         assert_eq!(cap_error.unwrap(), OctopipesCapError::FileSystemError);
         assert_eq!(cap_error.unwrap().to_string(), String::from("FileSystemError"));
-        println!("DEBUG: {:?}", cap_error);
+        println!("DEBUG: {:?}; DISPLAY: {}", cap_error.unwrap(), cap_error.unwrap());
         let cap_error: Option<OctopipesCapError> = OctopipesCapError::from_u8(0xe0);
         assert!(cap_error.is_none());
     }

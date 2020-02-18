@@ -25,11 +25,21 @@
 // SOFTWARE.
 //
 
+#[cfg(any(unix, macos, linux))]
 extern crate unix_named_pipe;
+
+#[cfg(windows)]
+extern crate windows_named_pipe;
+//Pipe prefix
+#[cfg(windows)]
+const WINDOWS_PIPE_PREFIX: &str = "\\\\.pipe\\";
 
 use std::io::{Error, ErrorKind, Read, Write};
 use std::time::{Duration, Instant};
 
+//@!Unix / Linux / MacOS functions
+
+#[cfg(any(unix, macos))]
 /// ### pipe_create
 ///
 /// `pipe_create` creates a Unix Pipe in the specified path
@@ -39,12 +49,13 @@ pub(super) fn pipe_create(path: &String) -> std::io::Result<()> {
         Err(error) => {
             match error.kind() {
                 ErrorKind::AlreadyExists => Ok(()), //OK if already exists
-                _ => Err(error)
+                _ => Err(error),
             }
-        },
+        }
     }
 }
 
+#[cfg(any(unix, macos))]
 /// ### pipe_delete
 ///
 /// `pipe_delete` deletes a Unix Pipe in the specified path
@@ -55,9 +66,11 @@ pub(super) fn pipe_delete(path: &String) -> std::io::Result<()> {
     }
 }
 
+#[cfg(any(unix, macos))]
 /// ### pipe_read
 ///
-/// `pipe_read` read from pipe; Returns or if after millis nothing has been read or if there's no more data available
+/// `pipe_read` read from pipe; Returns or if after millis nothing has been read or if there's no more data available.
+/// pipe does not have to contain \\.pipe\ prefix
 pub(super) fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<Option<Vec<u8>>> {
     //Try open pipe
     let res = unix_named_pipe::open_read(path);
@@ -93,8 +106,8 @@ pub(super) fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<
                     ErrorKind::WouldBlock => {
                         time_elapsed = t_start.elapsed();
                         continue;
-                    },
-                    _ => return Err(error)
+                    }
+                    _ => return Err(error),
                 }
             }
         }
@@ -106,10 +119,15 @@ pub(super) fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<
     }
 }
 
+#[cfg(any(unix, macos))]
 /// ### pipe_write
 ///
 /// `pipe_write` write to pipe; Returns after millis if nothing has been written or if the entire payload has been written. ErrorKind is WriteZero if there was no endpoint reading the pipe
-pub(super) fn pipe_write(path: &String, timeout_millis: u128, data_out: Vec<u8>) -> std::io::Result<()> {
+pub(super) fn pipe_write(
+    path: &String,
+    timeout_millis: u128,
+    data_out: Vec<u8>,
+) -> std::io::Result<()> {
     //Try open pipe
     let t_start = Instant::now();
     let mut time_elapsed: Duration = Duration::from_millis(0);
@@ -117,25 +135,25 @@ pub(super) fn pipe_write(path: &String, timeout_millis: u128, data_out: Vec<u8>)
     while time_elapsed.as_millis() < timeout_millis || timeout_millis == 0 {
         let res = unix_named_pipe::open_write(path);
         match res {
-            Ok(file) => { 
+            Ok(file) => {
                 //Pipe OPEN, break and go write
                 pipe_wrapper = Some(file);
                 break;
-            },
+            }
             Err(err) => {
                 match err.kind() {
                     ErrorKind::Other => {
                         //Continue
                         time_elapsed = t_start.elapsed();
                         continue;
-                    },
-                    _ => return Err(err)
+                    }
+                    _ => return Err(err),
                 }
             }
         }
     }
     if pipe_wrapper.is_none() {
-        return Err(Error::from(ErrorKind::WriteZero))
+        return Err(Error::from(ErrorKind::WriteZero));
     }
     let mut bytes_written: usize = 0;
     let mut pipe: std::fs::File = pipe_wrapper.unwrap();
@@ -151,15 +169,160 @@ pub(super) fn pipe_write(path: &String, timeout_millis: u128, data_out: Vec<u8>)
                     continue;
                 }
             }
-            Err(error) => {
-                return Err(error)
-            },
+            Err(error) => return Err(error),
         }
     }
     if bytes_written < data_out.len() {
         return Err(Error::from(ErrorKind::WriteZero));
     }
     Ok(())
+}
+
+//@!Windows functions
+
+#[cfg(windows)]
+/// ### pipe_create
+///
+/// `pipe_create` Try to create a Windows Pipe
+pub(super) fn pipe_create(path: &String) -> std::io::Result<()> {
+    let win_path: String = to_windows_path(path);
+    let path_struct = std::path::Path::new(&win_path);
+    match windows_named_pipe::PipeStream::connect(path_struct) {
+        Ok(_) => Ok(()),
+        Err(err) => return Err(err),
+    }
+}
+
+#[cfg(windows)]
+/// ### pipe_delete
+///
+/// `pipe_delete` On windows, does absolutely nothing
+pub(super) fn pipe_delete(_path: &String) -> std::io::Result<()> {
+    Ok(())
+}
+
+#[cfg(windows)]
+/// ### pipe_read
+///
+/// `pipe_read` read from pipe; Returns or if after millis nothing has been read or if there's no more data available
+pub(super) fn pipe_read(path: &String, timeout_millis: u128) -> std::io::Result<Option<Vec<u8>>> {
+    //Try open pipe
+    let win_path: String = to_windows_path(path);
+    let path_struct = std::path::Path::new(&win_path);
+    let mut pipe: windows_named_pipe::PipeStream =
+        match windows_named_pipe::PipeStream::connect(path_struct) {
+            Ok(stream) => stream,
+            Err(err) => return Err(err),
+        };
+    let t_start = Instant::now();
+    let mut time_elapsed: Duration = Duration::from_millis(0);
+    let mut data_out: Vec<u8> = Vec::new();
+    while time_elapsed.as_millis() < timeout_millis || timeout_millis == 0 {
+        let mut buffer: [u8; 2048] = [0; 2048];
+        match pipe.read(&mut buffer) {
+            Ok(bytes) => {
+                //Sum elapsed time
+                //If 0 bytes were read:
+                // - If there are already bytes in the buffer, return
+                // - Otherwise continue until time_elapsed < timeout
+                if bytes == 0 {
+                    if data_out.len() > 0 {
+                        break;
+                    } else {
+                        time_elapsed = t_start.elapsed(); //Sum time only if no data was received (in order to prevent cuts)
+                        continue;
+                    }
+                }
+                //Add buffer to data
+                data_out.extend_from_slice(&buffer[0..bytes]);
+            }
+            Err(error) => {
+                //Check error
+                match error.kind() {
+                    ErrorKind::WouldBlock => {
+                        time_elapsed = t_start.elapsed();
+                        continue;
+                    }
+                    _ => return Err(error),
+                }
+            }
+        }
+    }
+    if data_out.len() > 0 {
+        Ok(Some(data_out))
+    } else {
+        Ok(None)
+    }
+}
+
+#[cfg(windows)]
+/// ### pipe_write
+///
+/// `pipe_write` write to pipe; Returns after millis if nothing has been written or if the entire payload has been written. ErrorKind is WriteZero if there was no endpoint reading the pipe
+pub(super) fn pipe_write(
+    path: &String,
+    timeout_millis: u128,
+    data_out: Vec<u8>,
+) -> std::io::Result<()> {
+    //Try open pipe
+    let t_start = Instant::now();
+    let mut time_elapsed: Duration = Duration::from_millis(0);
+    let mut pipe_wrapper: Option<windows_named_pipe::PipeStream> = None;
+    let win_path: String = to_windows_path(path);
+    let path_struct = std::path::Path::new(&win_path);
+    while time_elapsed.as_millis() < timeout_millis || timeout_millis == 0 {
+        let res = windows_named_pipe::PipeStream::connect(path_struct);
+        match res {
+            Ok(stream) => {
+                //Pipe OPEN, break and go write
+                pipe_wrapper = Some(stream);
+                break;
+            }
+            Err(err) => {
+                match err.kind() {
+                    ErrorKind::Other => {
+                        //Continue
+                        time_elapsed = t_start.elapsed();
+                        continue;
+                    }
+                    _ => return Err(err),
+                }
+            }
+        }
+    }
+    if pipe_wrapper.is_none() {
+        return Err(Error::from(ErrorKind::WriteZero));
+    }
+    let mut bytes_written: usize = 0;
+    let mut pipe: windows_named_pipe::PipeStream = pipe_wrapper.unwrap();
+    while time_elapsed.as_millis() < timeout_millis || timeout_millis == 0 {
+        match pipe.write(data_out.as_slice()) {
+            Ok(bytes) => {
+                //Sum elapsed time
+                time_elapsed = t_start.elapsed();
+                bytes_written += bytes;
+                if bytes_written == data_out.len() {
+                    break;
+                } else {
+                    continue;
+                }
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    if bytes_written < data_out.len() {
+        return Err(Error::from(ErrorKind::WriteZero));
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn to_windows_path(path: &String) -> String {
+    if path.starts_with(WINDOWS_PIPE_PREFIX) {
+        String::from(path)
+    } else {
+        format!("{}{}", WINDOWS_PIPE_PREFIX, path)
+    }
 }
 
 //@! Tests
@@ -180,7 +343,7 @@ mod tests {
             panic!("Could not create pipe: {}", ioerr)
         }
         //Then delete it
-        if let Err(ioerr) =  pipe_delete(&String::from("/tmp/pipe_test")) {
+        if let Err(ioerr) = pipe_delete(&String::from("/tmp/pipe_test")) {
             panic!("Could not delete previously created pipe: {}", ioerr)
         }
         if let Ok(_) = pipe_delete(&String::from("/tmp/pipe_test")) {
@@ -294,7 +457,7 @@ mod tests {
         match pipe_write(
             &String::from("/tmp/pipe_write_noendpoint"),
             3000,
-            vec![0x00, 0x01, 0x02, 0x03]
+            vec![0x00, 0x01, 0x02, 0x03],
         ) {
             Ok(_) => {
                 panic!("Pipe write without end point should have returned error (WriteZero), but returned OK");
@@ -307,8 +470,12 @@ mod tests {
                         "Elapsed time should be at least 3000ms, but is {}",
                         elapsed_time.as_millis()
                     );
-                },
-                _ => panic!("Error kind should be WriteZero, but is {} ({:?})", ioerr, ioerr.kind())
+                }
+                _ => panic!(
+                    "Error kind should be WriteZero, but is {} ({:?})",
+                    ioerr,
+                    ioerr.kind()
+                ),
             },
         }
         //Then delete it
